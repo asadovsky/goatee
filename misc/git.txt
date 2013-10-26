@@ -11,5 +11,6 @@ git commit -m 'initial commit'
 git push -u origin master
 
 git config --list
+git config --global push.default simple
 git config --global user.name "Adam Sadovsky"
 git config --global user.email "asadovsky@gmail.com"
