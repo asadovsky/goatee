@@ -1,3 +1,5 @@
+https://help.github.com/articles/create-a-repo
+
 git help
 
 git init
@@ -6,6 +8,11 @@ git pull origin master
 
 git status
 git add .
+
+git diff
+git difftool -t tkdiff -y HEAD
+git difftool -t opendiff -y HEAD
+
 git commit -m 'initial commit'
 
 git push -u origin master
