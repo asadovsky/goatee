@@ -8,4 +8,8 @@ git status
 git add .
 git commit -m 'initial commit'
 
-git push --set-upstream origin master
+git push -u origin master
+
+git config --list
+git config --global user.name "Adam Sadovsky"
+git config --global user.email "asadovsky@gmail.com"
