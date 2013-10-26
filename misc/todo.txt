@@ -1,0 +1,4 @@
+- Fix OT edge cases, e.g. handle non-ASCII chars
+- Implement cursor
+- Implement undo/redo
+- Support offline editing (i.e. if WebSocket closes)
