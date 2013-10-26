@@ -1,0 +1,11 @@
+git help
+
+git init
+git remote add origin git@github.com:asadovsky/goatee.git
+git pull origin master
+
+git status
+git add .
+git commit -m 'initial commit'
+
+git push --set-upstream origin master
