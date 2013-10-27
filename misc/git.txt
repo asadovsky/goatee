@@ -2,10 +2,22 @@ https://help.github.com/articles/create-a-repo
 
 git help
 
+# General configuration.
+git config --list
+git config --global push.default simple
+git config --global user.name "Adam Sadovsky"
+git config --global user.email "asadovsky@gmail.com"
+
+# Create new local repo, set remote.
 git init
 git remote add origin git@github.com:asadovsky/goatee.git
 git pull origin master
 
+# Or clone remote.
+git clone git@github.com:asadovsky/goatee.git
+git remote show origin
+
+# Check status, add files, diff against head, commit, push.
 git status
 git add .
 
@@ -16,8 +28,3 @@ git difftool -t opendiff -y HEAD
 git commit -m 'initial commit'
 
 git push -u origin master
-
-git config --list
-git config --global push.default simple
-git config --global user.name "Adam Sadovsky"
-git config --global user.email "asadovsky@gmail.com"
