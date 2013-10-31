@@ -1,3 +1,6 @@
+- Add more editor tests
+- Set up Travis (http://travis-ci.org/)
+- Update README.md
 - Fix OT edge cases, e.g. handle non-ASCII chars
 - Implement cursor
 - Implement undo/redo
