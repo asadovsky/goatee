@@ -686,5 +686,3 @@ Editor.prototype.handleMouseMove = function(e) {
   }
   this.renderSelectionAndCursor();
 };
-
-var ed = new Editor(document.querySelector('#editor'));
