@@ -1,4 +1,11 @@
+Editor
+- See TODOs in editor.js
+- Separate model from view
+- Keep track of model updates since last render, so that render automatically
+  knows which parts of view to update
+
+OT
 - Fix OT edge cases, e.g. handle non-ASCII chars
-- Implement cursor
-- Implement undo/redo
+- Support cursors and selections
+- Support undo/redo
 - Support offline editing (i.e. if WebSocket closes)

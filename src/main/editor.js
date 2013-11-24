@@ -5,10 +5,8 @@
 //  - Add some tests
 //    * http://pivotal.github.io/jasmine/
 //    * http://sinonjs.org/
-//  - Make select-scroll smooth
-//  - Make select-scroll work when mouse goes below window
-//  - Make shift arrow (keyboard-based selection) work
 //  - Support OT insert/delete text ops and cursor/selection ops
+//  - Make select-scroll smooth
 //  - Support bold, italics
 //  - Support font-size and line-height
 //  - Support non-ASCII characters
@@ -19,6 +17,9 @@
 'use strict';
 
 var DEBUG = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+// Data structures
 
 var HtmlSizer = function(parentEl) {
   this.el = document.createElement('div');
@@ -44,19 +45,26 @@ HtmlSizer.prototype.height = function(html) {
   return this.size(html)[1];
 };
 
+var CursorPos = function(p, row, left) {
+  this.p = p;        // in [0, text.length]
+  this.row = row;    // row (line number), used for up/down arrow keys
+  this.left = left;  // left position, in pixels
+
+  // Used for tracking previous left position, needed to implement up and down
+  // arrow keys.
+  this.prevLeft = null;
+};
+
+CursorPos.prototype.copy = function() {
+  return new CursorPos(this.p, this.row, this.left);
+};
+
 var Cursor = function() {
-  this.p = 0;     // in [0, text.length]
-  this.row = 0;   // row (line number), used for up/down arrow keys
-  this.left = 0;  // left position, in pixels
+  this.pos = new CursorPos(0, 0, 0);
+  this.sel = null;  // start pos of selection, or null if no selection
 
   this.hasFocus = true;  // whether the editor has focus
   this.blinkTimer = 0;
-
-  // If not null, the region between p and selP is selected.
-  // Note, selP may be bigger than p.
-  this.selP = null;
-  // If not null, the row and left from start of selection.
-  this.selRowLeft = null;
 
   this.el = document.createElement('div');
   this.el.className = 'cursor';
@@ -71,7 +79,7 @@ var Cursor = function() {
 
 // Here, bottom means "distance from top of editor to bottom of cursor".
 Cursor.prototype.renderInternal = function(left, bottom, height) {
-  if (DEBUG) console.log(this.p, this.selP, this.row, this.hasFocus);
+  if (DEBUG) console.log(this.pos, this.sel, this.hasFocus);
   if (DEBUG) console.log(left, bottom, height);
 
   this.el.style.left = left + 'px';
@@ -80,9 +88,10 @@ Cursor.prototype.renderInternal = function(left, bottom, height) {
 
   if (!this.hasFocus) {
     this.el.style.visibility = 'hidden';
-  } else if (this.selP !== null) {
+  } else if (this.sel !== null) {
     this.blinkTimer = -1;
-    this.el.style.visibility = (this.p === this.selP ? 'visible' : 'hidden');
+    this.el.style.visibility = (
+      this.pos.p === this.sel.p ? 'visible' : 'hidden');
   } else {
     this.blinkTimer = 0;
     this.el.style.visibility = 'visible';
@@ -103,11 +112,13 @@ var Editor = function(editorEl) {
   this.text = '';
   this.clipboard = '';
   this.cursor = new Cursor();
+  this.mouseIsDown = false;
 
-  // Populated by renderAll.
-  this.charSizes = [];     // array of [width, height]
-  this.linePOffsets = [];  // array of [beginP, endP]
-  this.lineYOffsets = [];  // array of [begin, end] px relative to window top
+  // Updated by insertText and deleteText.
+  this.charSizes = [];       // array of [width, height]
+  // Updated by renderAll.
+  this.linePOffsets = null;  // array of [beginP, endP]
+  this.lineYOffsets = null;  // array of [begin, end] px relative to window top
 
   this.textEl = document.createElement('div');
   this.innerEl = document.createElement('div');
@@ -137,22 +148,89 @@ var Editor = function(editorEl) {
   document.addEventListener('mouseup', this.handleMouseUp.bind(this));
 };
 
-Editor.prototype.insertText = function(p, value) {
-  this.text = this.text.substr(0, p) + value + this.text.substr(p);
-  this.cursor.p += value.length;
-  var valueCharSizes = new Array(value.length);
-  for (var i = 0; i < value.length; i++) {
-    var c = value.charAt(i);
-    valueCharSizes[i] = this.hs.size(this.makeLineHtml(c, p + i));
+////////////////////////////////////////////////////////////////////////////////
+// Utility methods
+
+Editor.prototype.rowFromY = function(y) {
+  var row;
+  // TODO: Use binary search.
+  for (row = 0; row < this.lineYOffsets.length - 1; row++) {
+    if (y <= this.lineYOffsets[row][1]) break;
   }
-  this.charSizes = this.charSizes.slice(0, p).concat(
-    valueCharSizes, this.charSizes.slice(p));
+  return row;
 };
 
-Editor.prototype.deleteText = function(p, len) {
-  this.text = this.text.substr(0, p) + this.text.substr(p + len);
-  this.cursor.p = p;
-  this.charSizes.splice(p, len);
+Editor.prototype.cursorHop = function(p, forward, hop) {
+  if (forward) {
+    if (hop) {
+      while (p < this.text.length && /\s/.test(this.text.charAt(p))) p++;
+      while (p < this.text.length && !/\s/.test(this.text.charAt(p))) p++;
+    } else if (p < this.text.length) {
+      p++;
+    }
+  } else {  // backward
+    if (hop) {
+      while (p > 0 && /\s/.test(this.text.charAt(p - 1))) p--;
+      while (p > 0 && !/\s/.test(this.text.charAt(p - 1))) p--;
+    } else if (p > 0) {
+      p--;
+    }
+  }
+  return p;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Model update methods
+
+// Some of these (e.g. insertText) also update data needed only for rendering,
+// for efficiency purposes.
+
+// Updates cursor state given row and x position (in pixels).
+// Assumes text, charSizes, etc. are up-to-date.
+Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
+  // Find char whose left is closest to x.
+  var beginEnd = this.linePOffsets[row];
+  var pEnd = beginEnd[1];
+  if (pEnd > 0 && this.text.charAt(pEnd - 1) === '\r') pEnd--;
+
+  var p = beginEnd[0], left = 0;
+  for (; p < pEnd; p++) {
+    var newLeft = left + this.charSizes[p][0];
+    if (newLeft >= x) {
+      // Pick between left and newLeft.
+      if (newLeft - x < x - left) {
+        left = newLeft;
+        p++;
+      }
+      break;
+    }
+    left = newLeft;
+  }
+
+  this.cursor.pos.p = p;
+  this.cursor.pos.row = row;
+  this.cursor.pos.left = left;
+  if (clearPrevLeft) this.cursor.pos.prevLeft = null;
+};
+
+// Updates cursor state given p (offset).
+// Assumes text, charSizes, etc. are up-to-date.
+Editor.prototype.updateCursorFromP = function(p) {
+  var numRows = this.linePOffsets.length;
+  var row = 0;
+  // TODO: Use binary search.
+  for (; row < numRows - 1; row++) {
+    if (p < this.linePOffsets[row][1]) break;
+  }
+  var left = 0;
+  for (var q = this.linePOffsets[row][0]; q < p; q++) {
+    left += this.charSizes[q][0];
+  }
+
+  this.cursor.pos.p = p;
+  this.cursor.pos.row = row;
+  this.cursor.pos.left = left;
+  this.cursor.pos.prevLeft = null;
 };
 
 Editor.escapeCharMap = {
@@ -186,42 +264,60 @@ Editor.prototype.makeLineHtml = function(text, p) {
   return '<div class="line"><div class="line-inner">' + res + '</div></div>';
 };
 
+// Updates text, charSizes, and cursor offset. Other cursor state (row and left)
+// must be updated by renderAll, since that's where we update linePOffsets and
+// lineYOffsets.
+Editor.prototype.insertText = function(p, value) {
+  this.text = this.text.substr(0, p) + value + this.text.substr(p);
+  var valueCharSizes = new Array(value.length);
+  for (var i = 0; i < value.length; i++) {
+    var c = value.charAt(i);
+    valueCharSizes[i] = this.hs.size(this.makeLineHtml(c, p + i));
+  }
+  this.charSizes = this.charSizes.slice(0, p).concat(
+    valueCharSizes, this.charSizes.slice(p));
+  this.cursor.pos.p += value.length;
+};
+
+// See comment for insertText.
+Editor.prototype.deleteText = function(p, len) {
+  this.text = this.text.substr(0, p) + this.text.substr(p + len);
+  this.charSizes.splice(p, len);
+  this.cursor.pos.p = p;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Selection-specific model update methods
+
+Editor.prototype.getSelection = function() {
+  if (this.cursor.sel === null || this.cursor.pos.p === this.cursor.sel.p) {
+    return null;
+  } else if (this.cursor.pos.p < this.cursor.sel.p) {
+    return [this.cursor.pos.p, this.cursor.sel.p];
+  } else {
+    return [this.cursor.sel.p, this.cursor.pos.p];
+  }
+};
+
+Editor.prototype.clearSelection = function() {
+  this.cursor.sel = null;
+};
+
+// See comment for insertText.
+Editor.prototype.deleteSelection = function() {
+  var sel = this.getSelection();
+  console.assert(sel !== null);
+  this.deleteText(sel[0], sel[1] - sel[0]);
+  this.cursor.sel = null;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Pure rendering methods
+
 Editor.prototype.renderCursor = function() {
-  var beginEnd = this.lineYOffsets[this.cursor.row];
+  var beginEnd = this.lineYOffsets[this.cursor.pos.row];
   this.cursor.renderInternal(
-    this.cursor.left, beginEnd[1], beginEnd[1] - beginEnd[0]);
-};
-
-// Updates cursor state (p, left), then renders cursor.
-Editor.prototype.updateCursorFromRowAndX = function(row, x, updateLeft) {
-  var tup = this.charPosFromRowAndX(row, x);
-  var p = tup[0], left = tup[1];
-  var beginEnd = this.lineYOffsets[row];
-
-  this.cursor.p = p;
-  this.cursor.row = row;
-  if (updateLeft) this.cursor.left = left;
-  this.cursor.renderInternal(left, beginEnd[1], beginEnd[1] - beginEnd[0]);
-};
-
-// Updates cursor state (row, left), then renders cursor.
-Editor.prototype.updateCursorFromP = function(p) {
-  var numRows = this.linePOffsets.length;
-  var row = 0;
-  // TODO: Use binary search.
-  for (; row < numRows - 1; row++) {
-    if (p < this.linePOffsets[row][1]) break;
-  }
-  var left = 0;
-  for (var q = this.linePOffsets[row][0]; q < p; q++) {
-    left += this.charSizes[q][0];
-  }
-  var beginEnd = this.lineYOffsets[row];
-
-  this.cursor.p = p;
-  this.cursor.row = row;
-  this.cursor.left = left;
-  this.cursor.renderInternal(left, beginEnd[1], beginEnd[1] - beginEnd[0]);
+    this.cursor.pos.left, beginEnd[1], beginEnd[1] - beginEnd[0]);
 };
 
 Editor.prototype.renderSelectionAndCursor = function() {
@@ -263,16 +359,7 @@ Editor.prototype.renderSelectionAndCursor = function() {
     }
   }
 
-  // Can only happen on mousedown + mousemove, with 0 chars selected.
-  if (sel === null && this.cursor.selRowLeft !== null) {
-    // Use row and left from start of selection so that this location is used
-    // even if it's EOL.
-    this.cursor.row = this.cursor.selRowLeft[0];
-    this.cursor.left = this.cursor.selRowLeft[1];
-    this.renderCursor();
-  } else {
-    this.updateCursorFromP(this.cursor.p);
-  }
+  this.renderCursor();
 };
 
 // Renders text, selection, and cursor.
@@ -351,59 +438,14 @@ Editor.prototype.renderAll = function() {
     beginPx += lineHeight;
   }
 
+  // Now that we've updated linePOffsets and lineYOffsets, we can update cursor
+  // row and left.
+  this.updateCursorFromP(this.cursor.pos.p);
   this.renderSelectionAndCursor();
 };
 
-Editor.prototype.rowFromY = function(y) {
-  var row;
-  // TODO: Use binary search.
-  for (row = 0; row < this.lineYOffsets.length - 1; row++) {
-    if (y <= this.lineYOffsets[row][1]) break;
-  }
-  return row;
-};
-
-// Returns [p, left] for character.
-Editor.prototype.charPosFromRowAndX = function(row, x) {
-  // Find char whose left is closest to x.
-  var beginEnd = this.linePOffsets[row];
-  var pEnd = beginEnd[1];
-  if (pEnd > 0 && this.text.charAt(pEnd - 1) === '\r') pEnd--;
-
-  var p = beginEnd[0], left = 0;
-  for (; p < pEnd; p++) {
-    var newLeft = left + this.charSizes[p][0];
-    if (newLeft >= x) {
-      // Pick between left and newLeft.
-      if (newLeft - x < x - left) {
-        left = newLeft;
-        p++;
-      }
-      break;
-    }
-    left = newLeft;
-  }
-  return [p, left];
-};
-
-Editor.prototype.cursorHop = function(p, forward, hop) {
-  if (forward) {
-    if (hop) {
-      while (p < this.text.length && /\s/.test(this.text.charAt(p))) p++;
-      while (p < this.text.length && !/\s/.test(this.text.charAt(p))) p++;
-    } else if (p < this.text.length) {
-      p++;
-    }
-  } else {  // backward
-    if (hop) {
-      while (p > 0 && /\s/.test(this.text.charAt(p - 1))) p--;
-      while (p > 0 && !/\s/.test(this.text.charAt(p - 1))) p--;
-    } else if (p > 0) {
-      p--;
-    }
-  }
-  return p;
-};
+////////////////////////////////////////////////////////////////////////////////
+// Input handlers
 
 // We ignore these keypress codes.
 Editor.ignore = {
@@ -414,42 +456,19 @@ Editor.ignore = {
   63272: true   // ctrl delete
 };
 
-Editor.prototype.getSelection = function() {
-  if (this.cursor.selP === null || this.cursor.p === this.cursor.selP) {
-    return null;
-  } else if (this.cursor.p < this.cursor.selP) {
-    return [this.cursor.p, this.cursor.selP];
-  } else {
-    return [this.cursor.selP, this.cursor.p];
-  }
-};
-
-Editor.prototype.clearSelection = function() {
-  console.assert(this.cursor.selP !== null);
-  this.cursor.selP = null;
-  this.cursor.selRowLeft = null;
-};
-
-Editor.prototype.deleteSelection = function() {
-  var sel = this.getSelection();
-  console.assert(sel !== null);
-  this.deleteText(sel[0], sel[1] - sel[0]);
-  this.cursor.selP = null;
-  this.cursor.selRowLeft = null;
-};
-
 Editor.prototype.handleKeyPress = function(e) {
-  if (!this.cursor.hasFocus) return;
+  if (!this.cursor.hasFocus || this.mouseIsDown) return;
+
   if (Editor.ignore[e.which]) return;
   if (e.which > 127) return;  // require ASCII for now
   e.preventDefault();
-  if (this.cursor.selP !== null) this.deleteSelection();
-  this.insertText(this.cursor.p, String.fromCharCode(e.which));
+  if (this.cursor.sel !== null) this.deleteSelection();
+  this.insertText(this.cursor.pos.p, String.fromCharCode(e.which));
   this.renderAll();
 };
 
 Editor.prototype.handleKeyDown = function(e) {
-  if (!this.cursor.hasFocus) return;
+  if (!this.cursor.hasFocus || this.mouseIsDown) return;
 
   var sel = this.getSelection();
   if (e.metaKey) {
@@ -457,15 +476,13 @@ Editor.prototype.handleKeyDown = function(e) {
     switch (c) {
     case 'V':
       if (sel !== null) this.deleteSelection();
-      this.insertText(this.cursor.p, this.clipboard);
+      this.insertText(this.cursor.pos.p, this.clipboard);
       this.renderAll();
       break;
     case 'A':
-      if (this.text.length > 0) {
-        this.cursor.p = 0;
-        this.cursor.selP = this.text.length;
-        this.cursor.selRowLeft = null;
-      }
+      this.cursor.sel = new CursorPos(this.text.length, null, null);
+      this.updateCursorFromP(0);
+      if (this.cursor.sel.p === this.cursor.pos.p) this.cursor.sel = null;
       this.renderSelectionAndCursor();
       break;
     case 'X':
@@ -487,65 +504,109 @@ Editor.prototype.handleKeyDown = function(e) {
 
   switch (e.which) {
   case 35:  // end
-    if (sel !== null) {
-      this.clearSelection();
-      this.renderSelectionAndCursor();
-    }
     // Note, we use updateCursorFromRowAndX because we want to place the cursor
     // at EOL.
-    this.updateCursorFromRowAndX(this.cursor.row, this.innerWidth, true);
+    if (e.shiftKey) {
+      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      this.updateCursorFromRowAndX(this.cursor.pos.row, this.innerWidth, true);
+      if (this.cursor.sel.p === this.cursor.pos.p) this.cursor.sel = null;
+    } else {
+      this.updateCursorFromRowAndX(this.cursor.pos.row, this.innerWidth, true);
+      this.clearSelection();
+    }
+    this.renderSelectionAndCursor();
     break;
   case 36:  // home
-    if (sel !== null) {
+    if (e.shiftKey) {
+      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      this.updateCursorFromP(this.linePOffsets[this.cursor.pos.row][0]);
+      if (this.cursor.sel.p === this.cursor.pos.p) this.cursor.sel = null;
+    } else {
+      this.updateCursorFromP(this.linePOffsets[this.cursor.pos.row][0]);
       this.clearSelection();
-      this.renderSelectionAndCursor();
     }
-    this.updateCursorFromP(this.linePOffsets[this.cursor.row][0]);
+    this.renderSelectionAndCursor();
     break;
   case 37:  // left arrow
-    if (sel !== null) {
-      this.cursor.p = sel[0];
-      this.clearSelection();
-      this.renderSelectionAndCursor();
+    if (e.shiftKey) {
+      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      this.updateCursorFromP(
+        this.cursorHop(this.cursor.pos.p, false, e.ctrlKey));
+      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
     } else {
-      this.updateCursorFromP(this.cursorHop(this.cursor.p, false, e.ctrlKey));
+      if (sel !== null) {
+        this.updateCursorFromP(sel[0]);
+        this.clearSelection();
+      } else {
+        this.updateCursorFromP(
+          this.cursorHop(this.cursor.pos.p, false, e.ctrlKey));
+      }
     }
+    this.renderSelectionAndCursor();
     break;
   case 38:  // up arrow
-    if (sel !== null) {
+    var maybeMoveCursor = function() {
+      if (this.cursor.pos.row > 0) {
+        if (this.cursor.pos.prevLeft === null) {
+          this.cursor.pos.prevLeft = this.cursor.pos.left;
+        }
+        this.updateCursorFromRowAndX(
+          this.cursor.pos.row - 1, this.cursor.pos.prevLeft, false);
+      }
+    }.bind(this);
+    if (e.shiftKey) {
+      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      maybeMoveCursor();
+      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
+    } else {
+      maybeMoveCursor();
       this.clearSelection();
-      this.renderSelectionAndCursor();
     }
-    if (this.cursor.row !== 0) {
-      this.updateCursorFromRowAndX(
-        this.cursor.row - 1, this.cursor.left, false);
-    }
+    this.renderSelectionAndCursor();
     break;
   case 39:  // right arrow
-    if (sel !== null) {
-      this.cursor.p = sel[1];
-      this.clearSelection();
-      this.renderSelectionAndCursor();
+    if (e.shiftKey) {
+      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      this.updateCursorFromP(
+        this.cursorHop(this.cursor.pos.p, true, e.ctrlKey));
+      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
     } else {
-      this.updateCursorFromP(this.cursorHop(this.cursor.p, true, e.ctrlKey));
+      if (sel !== null) {
+        this.updateCursorFromP(sel[1]);
+        this.clearSelection();
+      } else {
+        this.updateCursorFromP(
+          this.cursorHop(this.cursor.pos.p, true, e.ctrlKey));
+      }
     }
+    this.renderSelectionAndCursor();
     break;
   case 40:  // down arrow
-    if (sel !== null) {
+    var maybeMoveCursor = function() {
+      if (this.cursor.pos.row < this.linePOffsets.length - 1) {
+        if (this.cursor.pos.prevLeft === null) {
+          this.cursor.pos.prevLeft = this.cursor.pos.left;
+        }
+        this.updateCursorFromRowAndX(
+          this.cursor.pos.row + 1, this.cursor.pos.prevLeft, false);
+      }
+    }.bind(this);
+    if (e.shiftKey) {
+      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      maybeMoveCursor();
+      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
+    } else {
+      maybeMoveCursor();
       this.clearSelection();
-      this.renderSelectionAndCursor();
     }
-    if (this.cursor.row !== this.linePOffsets.length - 1) {
-      this.updateCursorFromRowAndX(
-        this.cursor.row + 1, this.cursor.left, false);
-    }
+    this.renderSelectionAndCursor();
     break;
   case 8:  // backspace
     if (sel !== null) {
       this.deleteSelection();
     } else {
-      var beginP = this.cursorHop(this.cursor.p, false, e.ctrlKey);
-      this.deleteText(beginP, this.cursor.p - beginP);
+      var beginP = this.cursorHop(this.cursor.pos.p, false, e.ctrlKey);
+      this.deleteText(beginP, this.cursor.pos.p - beginP);
     }
     this.renderAll();
     break;
@@ -553,8 +614,8 @@ Editor.prototype.handleKeyDown = function(e) {
     if (sel !== null) {
       this.deleteSelection();
     } else {
-      var endP = this.cursorHop(this.cursor.p, true, e.ctrlKey);
-      this.deleteText(this.cursor.p, endP - this.cursor.p);
+      var endP = this.cursorHop(this.cursor.pos.p, true, e.ctrlKey);
+      this.deleteText(this.cursor.pos.p, endP - this.cursor.pos.p);
     }
     this.renderAll();
     break;
@@ -576,46 +637,53 @@ Editor.prototype.handleMouseDown = function(e) {
     return;
   }
   this.cursor.hasFocus = true;
+  this.mouseIsDown = true;
   e.preventDefault();
-
-  if (this.cursor.selP !== null) {
-    this.clearSelection();
-    this.renderSelectionAndCursor();
-  }
 
   var innerRect = this.innerEl.getBoundingClientRect();
   var x = viewportX - innerRect.left;
   var y = viewportY - innerRect.top;
   this.updateCursorFromRowAndX(this.rowFromY(y), x, true);
-  this.cursor.selP = this.cursor.p;
-  this.cursor.selRowLeft = [this.cursor.row, this.cursor.left];
+  this.cursor.sel = this.cursor.pos.copy();
+  this.renderSelectionAndCursor();
 
   document.addEventListener('mousemove', this.boundHandleMouseMove);
 };
 
 Editor.prototype.handleMouseUp = function(e) {
   if (!this.cursor.hasFocus) return;
+  this.mouseIsDown = false;
+  console.assert(this.cursor.sel !== null);
   e.preventDefault();
-  console.assert(this.cursor.selP !== null);
-  if (this.cursor.p === this.cursor.selP) {
+
+  if (this.cursor.pos.p === this.cursor.sel.p) {
     this.clearSelection();
     this.renderCursor();
   }
+
   document.removeEventListener('mousemove', this.boundHandleMouseMove);
 };
 
 Editor.prototype.handleMouseMove = function(e) {
   console.assert(this.cursor.hasFocus);
+  console.assert(this.mouseIsDown);
+  console.assert(this.cursor.sel !== null);
   e.preventDefault();
-  console.assert(this.cursor.selP !== null);
+
   var viewportX = e.pageX - window.pageXOffset;
   var viewportY = e.pageY - window.pageYOffset;
 
   var innerRect = this.innerEl.getBoundingClientRect();
   var x = viewportX - innerRect.left;
   var y = viewportY - innerRect.top;
-  this.cursor.p = this.charPosFromRowAndX(this.rowFromY(y), x)[0];
-
+  this.updateCursorFromRowAndX(this.rowFromY(y), x, true);
+  if (this.cursor.pos.p === this.cursor.sel.p) {
+    // Mouse is down, with 0 chars selected. Use row and left from start of
+    // selection so that this location is used for rendering the cursor even if
+    // it's EOL.
+    this.cursor.pos.row = this.cursor.sel.row;
+    this.cursor.pos.left = this.cursor.sel.left;
+  }
   this.renderSelectionAndCursor();
 };
 
