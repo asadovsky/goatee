@@ -2,9 +2,6 @@
 // instance for the #editor div.
 //
 // TODO:
-//  - Add some tests
-//    * http://pivotal.github.io/jasmine/
-//    * http://sinonjs.org/
 //  - Support OT insert/delete text ops and cursor/selection ops
 //  - Make select-scroll smooth
 //  - Support bold, italics
