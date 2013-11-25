@@ -1,0 +1,19 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-y: scroll;
+}
+
+body {
+  background: #eee;
+  font-family: arial, sans-serif;
+  margin: 0 auto;
+  position: relative;
+  width: 600px;
+}
+
+.display-none {
+  display: none;
+}

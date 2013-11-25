@@ -69,12 +69,12 @@ var Cursor = function() {
   this.el = document.createElement('div');
   this.el.className = 'cursor';
 
-  window.setInterval(function() {
+  window.setInterval((function() {
     if (!this.hasFocus || this.blinkTimer === -1) return;
     this.blinkTimer = (this.blinkTimer + 1) % 10;
     // Visible 60% of the time, hidden 40% of the time.
     this.el.style.visibility = (this.blinkTimer < 6) ? 'visible' : 'hidden';
-  }.bind(this), 100);
+  }).bind(this), 100);
 };
 
 // Here, bottom means "distance from top of editor to bottom of cursor".
@@ -109,12 +109,24 @@ Cursor.prototype.renderInternal = function(left, bottom, height) {
 };
 
 var Editor = function(editorEl) {
-  this.text = '';
+  this.el = editorEl;
+  this.reset();
+
+  // Finally, set up listeners to handle user input events.
+  this.boundHandleMouseMove = this.handleMouseMove.bind(this);
+  document.addEventListener('keypress', this.handleKeyPress.bind(this));
+  document.addEventListener('keydown', this.handleKeyDown.bind(this));
+  document.addEventListener('mousedown', this.handleMouseDown.bind(this));
+  document.addEventListener('mouseup', this.handleMouseUp.bind(this));
+};
+
+Editor.prototype.reset = function() {
   this.clipboard = '';
   this.cursor = new Cursor();
   this.mouseIsDown = false;
 
   // Updated by insertText and deleteText.
+  this.text = '';
   this.charSizes = [];       // array of [width, height]
   // Updated by renderAll.
   this.linePOffsets = null;  // array of [beginP, endP]
@@ -125,7 +137,9 @@ var Editor = function(editorEl) {
   this.innerEl.id = 'editor-inner';
   this.innerEl.appendChild(this.textEl);
   this.innerEl.appendChild(this.cursor.el);
-  this.el = editorEl;
+
+  // Remove any existing children, then add innerEl.
+  while (this.el.firstChild) this.el.removeChild(this.el.firstChild);
   this.el.appendChild(this.innerEl);
   this.hs = new HtmlSizer(this.el);
 
@@ -138,14 +152,7 @@ var Editor = function(editorEl) {
   this.border = parseInt(window.getComputedStyle(
     this.el, null).getPropertyValue('border-width'), 10);
 
-  this.renderAll();  // perform initial rendering
-
-  // Finally, set up listeners to handle user input events.
-  this.boundHandleMouseMove = this.handleMouseMove.bind(this);
-  document.addEventListener('keypress', this.handleKeyPress.bind(this));
-  document.addEventListener('keydown', this.handleKeyDown.bind(this));
-  document.addEventListener('mousedown', this.handleMouseDown.bind(this));
-  document.addEventListener('mouseup', this.handleMouseUp.bind(this));
+  this.renderAll();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -186,7 +193,7 @@ Editor.prototype.cursorHop = function(p, forward, hop) {
 // for efficiency purposes.
 
 // Updates cursor state given row and x position (in pixels).
-// Assumes text, charSizes, etc. are up-to-date.
+// Assumes text, charSizes, linePOffsets, etc. are up-to-date.
 Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
   // Find char whose left is closest to x.
   var beginEnd = this.linePOffsets[row];
@@ -214,7 +221,7 @@ Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
 };
 
 // Updates cursor state given p (offset).
-// Assumes text, charSizes, etc. are up-to-date.
+// Assumes text, charSizes, linePOffsets, etc. are up-to-date.
 Editor.prototype.updateCursorFromP = function(p) {
   var numRows = this.linePOffsets.length;
   var row = 0;
@@ -545,7 +552,7 @@ Editor.prototype.handleKeyDown = function(e) {
     this.renderSelectionAndCursor();
     break;
   case 38:  // up arrow
-    var maybeMoveCursor = function() {
+    var maybeMoveCursor = (function() {
       if (this.cursor.pos.row > 0) {
         if (this.cursor.pos.prevLeft === null) {
           this.cursor.pos.prevLeft = this.cursor.pos.left;
@@ -553,7 +560,7 @@ Editor.prototype.handleKeyDown = function(e) {
         this.updateCursorFromRowAndX(
           this.cursor.pos.row - 1, this.cursor.pos.prevLeft, false);
       }
-    }.bind(this);
+    }).bind(this);
     if (e.shiftKey) {
       if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
       maybeMoveCursor();
@@ -582,7 +589,7 @@ Editor.prototype.handleKeyDown = function(e) {
     this.renderSelectionAndCursor();
     break;
   case 40:  // down arrow
-    var maybeMoveCursor = function() {
+    var maybeMoveCursor = (function() {
       if (this.cursor.pos.row < this.linePOffsets.length - 1) {
         if (this.cursor.pos.prevLeft === null) {
           this.cursor.pos.prevLeft = this.cursor.pos.left;
@@ -590,7 +597,7 @@ Editor.prototype.handleKeyDown = function(e) {
         this.updateCursorFromRowAndX(
           this.cursor.pos.row + 1, this.cursor.pos.prevLeft, false);
       }
-    }.bind(this);
+    }).bind(this);
     if (e.shiftKey) {
       if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
       maybeMoveCursor();
