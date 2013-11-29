@@ -26,10 +26,11 @@ var KEY_CODES = {
   'delete': 46
 };
 
-// http://stackoverflow.com/questions/8942678/keyboardevent-in-chrome-keycode-is-0
-// This is a good example of where using jQuery would've saved time.
+// Returns a keypress event for the given character.
 var makeKeyPressEvent = function(k) {
   console.assert(k.length === 1, k);
+  // http://stackoverflow.com/questions/8942678/keyboardevent-in-chrome-keycode-is-0
+  // This is a good example of where using jQuery would've probably saved time.
   var e = document.createEvent('Events');
   // KeyboardEvents bubble and are cancelable.
   // https://developer.mozilla.org/en-US/docs/Web/API/event.initEvent
@@ -38,13 +39,14 @@ var makeKeyPressEvent = function(k) {
   return e;
 };
 
-// See comments for makeKeyPressEvent.
-// Here, cmd can be 'ctrl+c', 'shift+left', etc. Modifier keys must come before
-// the actual key.
+// Returns a keydown event for the given key combination. Here, cmd can be
+// 'ctrl+c', 'shift+left', 'end', etc. or a single character. Modifier keys must
+// precede the primary key.
 var makeKeyDownEvent = function(cmd) {
   console.assert(cmd.length > 0);
   var lastPlus = cmd.lastIndexOf('+');
   var key = lastPlus === -1 ? cmd : cmd.substr(lastPlus + 1);
+  // See comments in makeKeyPressEvent.
   var e = document.createEvent('Events');
   e.initEvent('keydown', true, true);
   if (key.length > 1) {
@@ -59,23 +61,27 @@ var makeKeyDownEvent = function(cmd) {
   return e;
 };
 
+// Simulates typing the given text at the current cursor position.
 var type = function(text) {
   for (var i = 0; i < text.length; i++) {
     document.dispatchEvent(makeKeyPressEvent(text[i]));
   }
 };
 
-var keyDownSeq = function(seq) {
+// Fires the given sequence of keydown commands.
+var fireKeyDownSeq = function(seq) {
   var arr = seq.split(' ');
   for (var i = 0; i < arr.length; i++) {
     document.dispatchEvent(makeKeyDownEvent(arr[i]));
   }
 };
 
+// Returns the editor text content.
 var text = function() {
   return ed.text;
 };
 
+// Returns the editor cursor position.
 var cpos = function() {
   return ed.cursor.pos.p;
 };
@@ -98,129 +104,129 @@ describe('Editor', function() {
   });
 
   it('ignores keydown chars', function() {
-    keyDownSeq('a');
+    fireKeyDownSeq('a');
     expect(tc()).toEqual(['', 0]);
   });
 
   it('insert, move', function() {
-    keyDownSeq('left right left');
+    fireKeyDownSeq('left right left');
     expect(tc()).toEqual(['', 0]);
     type('abc');
     expect(tc()).toEqual(['abc', 3]);
-    keyDownSeq('right');
+    fireKeyDownSeq('right');
     expect(cpos()).toEqual(3);
-    keyDownSeq('left');
+    fireKeyDownSeq('left');
     expect(cpos()).toEqual(2);
     type('de');
     expect(tc()).toEqual(['abdec', 4]);
-    keyDownSeq('left left left left');
+    fireKeyDownSeq('left left left left');
     expect(cpos()).toEqual(0);
-    keyDownSeq('left');
+    fireKeyDownSeq('left');
     expect(cpos()).toEqual(0);
     type('fg');
     expect(tc()).toEqual(['fgabdec', 2]);
-    keyDownSeq('right right left right');
+    fireKeyDownSeq('right right left right');
     expect(cpos()).toEqual(4);
   });
 
   it('delete, backspace', function() {
-    keyDownSeq('delete backspace');
+    fireKeyDownSeq('delete backspace');
     expect(tc()).toEqual(['', 0]);
     type('abc');
-    keyDownSeq('backspace');
+    fireKeyDownSeq('backspace');
     expect(tc()).toEqual(['ab', 2]);
-    keyDownSeq('delete left left');
+    fireKeyDownSeq('delete left left');
     expect(tc()).toEqual(['ab', 0]);
-    keyDownSeq('delete');
+    fireKeyDownSeq('delete');
     expect(tc()).toEqual(['b', 0]);
-    keyDownSeq('backspace right');
+    fireKeyDownSeq('backspace right');
     expect(tc()).toEqual(['b', 1]);
-    keyDownSeq('backspace');
+    fireKeyDownSeq('backspace');
     expect(tc()).toEqual(['', 0]);
     expect(tc()).toEqual(['', 0]);
   });
 
   it('home, end', function() {
-    keyDownSeq('home end home');
+    fireKeyDownSeq('home end home');
     expect(tc()).toEqual(['', 0]);
     type('123');
-    keyDownSeq('home');
+    fireKeyDownSeq('home');
     expect(cpos()).toEqual(0);
-    keyDownSeq('end');
+    fireKeyDownSeq('end');
     expect(cpos()).toEqual(3);
-    keyDownSeq('left home');
+    fireKeyDownSeq('left home');
     expect(cpos()).toEqual(0);
-    keyDownSeq('right end');
+    fireKeyDownSeq('right end');
     expect(cpos()).toEqual(3);
   });
 
   it('ctrl+arrow', function() {
     type('aa bb  cc');
     expect(cpos()).toEqual(9);
-    keyDownSeq('ctrl+left');
+    fireKeyDownSeq('ctrl+left');
     expect(cpos()).toEqual(7);
-    keyDownSeq('ctrl+left');
+    fireKeyDownSeq('ctrl+left');
     expect(cpos()).toEqual(3);
-    keyDownSeq('ctrl+left');
+    fireKeyDownSeq('ctrl+left');
     expect(cpos()).toEqual(0);
-    keyDownSeq('ctrl+left');
+    fireKeyDownSeq('ctrl+left');
     expect(cpos()).toEqual(0);
-    keyDownSeq('ctrl+right');
+    fireKeyDownSeq('ctrl+right');
     expect(cpos()).toEqual(2);
-    keyDownSeq('ctrl+right');
+    fireKeyDownSeq('ctrl+right');
     expect(cpos()).toEqual(5);
-    keyDownSeq('ctrl+right');
+    fireKeyDownSeq('ctrl+right');
     expect(cpos()).toEqual(9);
-    keyDownSeq('ctrl+right');
+    fireKeyDownSeq('ctrl+right');
     expect(cpos()).toEqual(9);
 
     ed.reset();
     type('  ');
     expect(cpos()).toEqual(2);
-    keyDownSeq('ctrl+left');
+    fireKeyDownSeq('ctrl+left');
     expect(cpos()).toEqual(0);
-    keyDownSeq('ctrl+right');
+    fireKeyDownSeq('ctrl+right');
     expect(cpos()).toEqual(2);
-    keyDownSeq('left ctrl+right');
+    fireKeyDownSeq('left ctrl+right');
     expect(cpos()).toEqual(2);
-    keyDownSeq('left ctrl+left');
+    fireKeyDownSeq('left ctrl+left');
     expect(cpos()).toEqual(0);
   });
 
   it('ctrl+delete, ctrl+backspace', function() {
-    keyDownSeq('ctrl+backspace ctrl+delete');
+    fireKeyDownSeq('ctrl+backspace ctrl+delete');
     expect(tc()).toEqual(['', 0]);
 
     type('aa bb  cc');
     expect(cpos()).toEqual(9);
-    keyDownSeq('ctrl+delete');
+    fireKeyDownSeq('ctrl+delete');
     expect(tc()).toEqual(['aa bb  cc', 9]);
-    keyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('ctrl+backspace');
     expect(tc()).toEqual(['aa bb  ', 7]);
-    keyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('ctrl+backspace');
     expect(tc()).toEqual(['aa ', 3]);
-    keyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('ctrl+backspace');
     expect(tc()).toEqual(['', 0]);
 
     type('aa bb  cc');
-    keyDownSeq('home');
+    fireKeyDownSeq('home');
     expect(cpos()).toEqual(0);
-    keyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('ctrl+backspace');
     expect(tc()).toEqual(['aa bb  cc', 0]);
-    keyDownSeq('ctrl+delete');
+    fireKeyDownSeq('ctrl+delete');
     expect(tc()).toEqual([' bb  cc', 0]);
-    keyDownSeq('ctrl+delete');
+    fireKeyDownSeq('ctrl+delete');
     expect(tc()).toEqual(['  cc', 0]);
-    keyDownSeq('ctrl+delete');
+    fireKeyDownSeq('ctrl+delete');
     expect(tc()).toEqual(['', 0]);
 
     type(' ');
     expect(cpos()).toEqual(1);
-    keyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('ctrl+backspace');
     expect(tc()).toEqual(['', 0]);
     type(' ');
     expect(cpos()).toEqual(1);
-    keyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('ctrl+backspace');
     expect(tc()).toEqual(['', 0]);
   });
 });
