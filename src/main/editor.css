@@ -1,20 +1,11 @@
-* {
-  box-sizing: border-box;
-}
-
-.display-none {
-  display: none;
-}
-
 #editor {
   background: #fff;
-  border: 1px solid #bbb;
+  border: 1px solid #999;
+  box-sizing: border-box;
   cursor: text;
   font-size: 16px;
   line-height: 16px;  /* equal to font-size */
-  margin: 20px 0;
   padding: 20px;
-  /*width: 100%;*/
   width: 600px;
 }
 

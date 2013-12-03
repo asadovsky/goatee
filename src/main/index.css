@@ -6,6 +6,15 @@ html {
   overflow-y: scroll;
 }
 
+body {
+  background: #eee;
+  font-family: arial, sans-serif;
+}
+
 .display-none {
   display: none;
+}
+
+textarea {
+  margin: 0;
 }

@@ -4,11 +4,9 @@
 //  - http://sinonjs.org/
 //
 // TODO:
-//  - shift+arrow, shift+ctrl+arrow
-//  - hit key when there's a selection
 //  - up, down, ctrl+up, ctrl+down
-//  - hit end key when line does not end in \r
-//  - rendering
+//  - Hit end key when line does not end in \r
+//  - Rendering
 
 'use strict';
 
@@ -76,158 +74,425 @@ var fireKeyDownSeq = function(seq) {
   }
 };
 
-// Returns the editor text content.
+// Returns the current text content.
 var text = function() {
   return ed.text;
 };
 
-// Returns the editor cursor position.
-var cpos = function() {
+// Returns the current cursor position.
+var curp = function() {
   return ed.cursor.pos.p;
 };
 
-var tc = function() {
-  return [text(), cpos()];
+// Returns the current selection start position, or null if there's no
+// selection.
+var selp = function() {
+  if (ed.cursor.sel === null) return null;
+  return ed.cursor.sel.p;
 };
 
-describe('Editor', function() {
+// Returns the current editor state: text, curp, selp, etc.
+var state = function() {
+  if (selp() === null) {
+    return [text(), curp()];
+  } else {
+    return [text(), curp(), selp()];
+  }
+};
+
+describe('Editor keyboard basics', function() {
   beforeEach(function() {
     ed.reset();
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
   });
 
-  it('inserts keypress chars', function() {
+  it('keypress inserts chars', function() {
     type('a');
-    expect(tc()).toEqual(['a', 1]);
+    expect(state()).toEqual(['a', 1]);
     type('a');
-    expect(tc()).toEqual(['aa', 2]);
+    expect(state()).toEqual(['aa', 2]);
   });
 
-  it('ignores keydown chars', function() {
+  it('keydown ignores chars', function() {
     fireKeyDownSeq('a');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
   });
 
-  it('insert, move', function() {
+  it('insert and move', function() {
     fireKeyDownSeq('left right left');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
     type('abc');
-    expect(tc()).toEqual(['abc', 3]);
+    expect(state()).toEqual(['abc', 3]);
     fireKeyDownSeq('right');
-    expect(cpos()).toEqual(3);
+    expect(curp()).toEqual(3);
     fireKeyDownSeq('left');
-    expect(cpos()).toEqual(2);
+    expect(curp()).toEqual(2);
     type('de');
-    expect(tc()).toEqual(['abdec', 4]);
+    expect(state()).toEqual(['abdec', 4]);
     fireKeyDownSeq('left left left left');
-    expect(cpos()).toEqual(0);
+    expect(curp()).toEqual(0);
     fireKeyDownSeq('left');
-    expect(cpos()).toEqual(0);
+    expect(curp()).toEqual(0);
     type('fg');
-    expect(tc()).toEqual(['fgabdec', 2]);
+    expect(state()).toEqual(['fgabdec', 2]);
     fireKeyDownSeq('right right left right');
-    expect(cpos()).toEqual(4);
+    expect(curp()).toEqual(4);
   });
 
-  it('delete, backspace', function() {
+  it('delete/backspace', function() {
     fireKeyDownSeq('delete backspace');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
     type('abc');
     fireKeyDownSeq('backspace');
-    expect(tc()).toEqual(['ab', 2]);
+    expect(state()).toEqual(['ab', 2]);
     fireKeyDownSeq('delete left left');
-    expect(tc()).toEqual(['ab', 0]);
+    expect(state()).toEqual(['ab', 0]);
     fireKeyDownSeq('delete');
-    expect(tc()).toEqual(['b', 0]);
+    expect(state()).toEqual(['b', 0]);
     fireKeyDownSeq('backspace right');
-    expect(tc()).toEqual(['b', 1]);
+    expect(state()).toEqual(['b', 1]);
     fireKeyDownSeq('backspace');
-    expect(tc()).toEqual(['', 0]);
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
   });
 
-  it('home, end', function() {
+  it('home/end', function() {
     fireKeyDownSeq('home end home');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
     type('123');
     fireKeyDownSeq('home');
-    expect(cpos()).toEqual(0);
+    expect(curp()).toEqual(0);
     fireKeyDownSeq('end');
-    expect(cpos()).toEqual(3);
+    expect(curp()).toEqual(3);
     fireKeyDownSeq('left home');
-    expect(cpos()).toEqual(0);
+    expect(curp()).toEqual(0);
     fireKeyDownSeq('right end');
-    expect(cpos()).toEqual(3);
+    expect(curp()).toEqual(3);
   });
 
   it('ctrl+arrow', function() {
-    type('aa bb  cc');
-    expect(cpos()).toEqual(9);
+    var t = 'aa bb  cc';
+    type(t);
+    expect(state()).toEqual([t, 9]);
     fireKeyDownSeq('ctrl+left');
-    expect(cpos()).toEqual(7);
+    expect(state()).toEqual([t, 7]);
     fireKeyDownSeq('ctrl+left');
-    expect(cpos()).toEqual(3);
+    expect(state()).toEqual([t, 3]);
     fireKeyDownSeq('ctrl+left');
-    expect(cpos()).toEqual(0);
+    expect(state()).toEqual([t, 0]);
     fireKeyDownSeq('ctrl+left');
-    expect(cpos()).toEqual(0);
+    expect(state()).toEqual([t, 0]);
     fireKeyDownSeq('ctrl+right');
-    expect(cpos()).toEqual(2);
+    expect(state()).toEqual([t, 2]);
     fireKeyDownSeq('ctrl+right');
-    expect(cpos()).toEqual(5);
+    expect(state()).toEqual([t, 5]);
     fireKeyDownSeq('ctrl+right');
-    expect(cpos()).toEqual(9);
+    expect(state()).toEqual([t, 9]);
     fireKeyDownSeq('ctrl+right');
-    expect(cpos()).toEqual(9);
+    expect(state()).toEqual([t, 9]);
 
+    // Non-alphanumeric chars should behave the same way as spaces.
     ed.reset();
-    type('  ');
-    expect(cpos()).toEqual(2);
+    t = 'aa+/|3a';
+    type(t);
+    expect(state()).toEqual([t, 7]);
     fireKeyDownSeq('ctrl+left');
-    expect(cpos()).toEqual(0);
+    expect(state()).toEqual([t, 5]);
+    fireKeyDownSeq('ctrl+left');
+    expect(state()).toEqual([t, 0]);
     fireKeyDownSeq('ctrl+right');
-    expect(cpos()).toEqual(2);
+    expect(state()).toEqual([t, 2]);
+    fireKeyDownSeq('ctrl+right');
+    expect(state()).toEqual([t, 7]);
+
+    // Leading and trailing space.
+    ed.reset();
+    t = '  ';
+    type(t);
+    expect(state()).toEqual([t, 2]);
+    fireKeyDownSeq('ctrl+left');
+    expect(state()).toEqual([t, 0]);
+    fireKeyDownSeq('ctrl+right');
+    expect(state()).toEqual([t, 2]);
     fireKeyDownSeq('left ctrl+right');
-    expect(cpos()).toEqual(2);
+    expect(state()).toEqual([t, 2]);
     fireKeyDownSeq('left ctrl+left');
-    expect(cpos()).toEqual(0);
+    expect(state()).toEqual([t, 0]);
   });
 
   it('ctrl+delete, ctrl+backspace', function() {
     fireKeyDownSeq('ctrl+backspace ctrl+delete');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
 
     type('aa bb  cc');
-    expect(cpos()).toEqual(9);
+    expect(curp()).toEqual(9);
     fireKeyDownSeq('ctrl+delete');
-    expect(tc()).toEqual(['aa bb  cc', 9]);
+    expect(state()).toEqual(['aa bb  cc', 9]);
     fireKeyDownSeq('ctrl+backspace');
-    expect(tc()).toEqual(['aa bb  ', 7]);
+    expect(state()).toEqual(['aa bb  ', 7]);
     fireKeyDownSeq('ctrl+backspace');
-    expect(tc()).toEqual(['aa ', 3]);
+    expect(state()).toEqual(['aa ', 3]);
     fireKeyDownSeq('ctrl+backspace');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
 
     type('aa bb  cc');
     fireKeyDownSeq('home');
-    expect(cpos()).toEqual(0);
+    expect(curp()).toEqual(0);
     fireKeyDownSeq('ctrl+backspace');
-    expect(tc()).toEqual(['aa bb  cc', 0]);
+    expect(state()).toEqual(['aa bb  cc', 0]);
     fireKeyDownSeq('ctrl+delete');
-    expect(tc()).toEqual([' bb  cc', 0]);
+    expect(state()).toEqual([' bb  cc', 0]);
     fireKeyDownSeq('ctrl+delete');
-    expect(tc()).toEqual(['  cc', 0]);
+    expect(state()).toEqual(['  cc', 0]);
     fireKeyDownSeq('ctrl+delete');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
 
     type(' ');
-    expect(cpos()).toEqual(1);
+    expect(curp()).toEqual(1);
     fireKeyDownSeq('ctrl+backspace');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
     type(' ');
-    expect(cpos()).toEqual(1);
+    expect(curp()).toEqual(1);
     fireKeyDownSeq('ctrl+backspace');
-    expect(tc()).toEqual(['', 0]);
+    expect(state()).toEqual(['', 0]);
+  });
+
+  it('shift+arrow', function() {
+    fireKeyDownSeq('shift+left shift+right shift+left');
+    expect(state()).toEqual(['', 0]);
+
+    var t = 'abc';
+    type(t);
+    expect(state()).toEqual([t, 3]);
+    fireKeyDownSeq('shift+left');
+    expect(state()).toEqual([t, 2, 3]);
+    fireKeyDownSeq('shift+left');
+    expect(state()).toEqual([t, 1, 3]);
+    fireKeyDownSeq('shift+right');
+    expect(state()).toEqual([t, 2, 3]);
+    fireKeyDownSeq('shift+right');
+    expect(state()).toEqual([t, 3]);
+    fireKeyDownSeq('home shift+right');
+    expect(state()).toEqual([t, 1, 0]);
+    fireKeyDownSeq('shift+left');
+    expect(state()).toEqual([t, 0]);
+  });
+
+  // Mostly copied from ctrl+arrow test.
+  it('shift+ctrl+arrow', function() {
+    var t = 'aa bb  cc';
+    type(t);
+    expect(state()).toEqual([t, 9]);
+    fireKeyDownSeq('shift+ctrl+left');
+    expect(state()).toEqual([t, 7, 9]);
+    fireKeyDownSeq('shift+ctrl+left');
+    expect(state()).toEqual([t, 3, 9]);
+    fireKeyDownSeq('shift+ctrl+left');
+    expect(state()).toEqual([t, 0, 9]);
+    fireKeyDownSeq('shift+ctrl+left');
+    expect(state()).toEqual([t, 0, 9]);
+    fireKeyDownSeq('shift+ctrl+right');
+    expect(state()).toEqual([t, 2, 9]);
+    fireKeyDownSeq('shift+ctrl+right');
+    expect(state()).toEqual([t, 5, 9]);
+    fireKeyDownSeq('shift+ctrl+right');
+    expect(state()).toEqual([t, 9]);
+    fireKeyDownSeq('shift+ctrl+right');
+    expect(state()).toEqual([t, 9]);
+
+    // Make sure that shift+ctrl+left can also drop the selection.
+    fireKeyDownSeq('home right right right');
+    expect(state()).toEqual([t, 3]);
+    fireKeyDownSeq('shift+ctrl+right');
+    expect(state()).toEqual([t, 5, 3]);
+    fireKeyDownSeq('shift+ctrl+left');
+    expect(state()).toEqual([t, 3]);
+
+    // Leading and trailing space.
+    ed.reset();
+    t = '  ';
+    type(t);
+    expect(state()).toEqual([t, 2]);
+    fireKeyDownSeq('shift+ctrl+left');
+    expect(state()).toEqual([t, 0, 2]);
+    fireKeyDownSeq('shift+ctrl+right');
+    expect(state()).toEqual([t, 2]);
+    fireKeyDownSeq('left shift+ctrl+right');
+    expect(state()).toEqual([t, 2, 1]);
+    fireKeyDownSeq('left shift+ctrl+left');
+    expect(state()).toEqual([t, 0, 1]);
+  });
+
+  it('shift+home/end', function() {
+    fireKeyDownSeq('shift+home shift+end shift+home');
+    expect(state()).toEqual(['', 0]);
+
+    var t = 'abc';
+    type(t);
+    expect(state()).toEqual([t, 3]);
+    fireKeyDownSeq('shift+home');
+    expect(state()).toEqual([t, 0, 3]);
+    fireKeyDownSeq('shift+end');
+    expect(state()).toEqual([t, 3]);
+    fireKeyDownSeq('ctrl+left shift+end');
+    expect(state()).toEqual([t, 3, 0]);
+    fireKeyDownSeq('shift+home');
+    expect(state()).toEqual([t, 0]);
+  });
+
+  it('select, then type', function() {
+    type('abc');
+    fireKeyDownSeq('shift+left');
+    type('de');
+    expect(state()).toEqual(['abde', 4]);
+    fireKeyDownSeq('shift+ctrl+left shift+right');
+    type('fg');
+    expect(state()).toEqual(['afg', 3]);
+  });
+
+  it('select, then arrow', function() {
+    var t = ' aa bb cc ';
+    type(t);
+
+    fireKeyDownSeq('end ctrl+left left shift+ctrl+left');
+    expect(state()).toEqual([t, 4, 6]);
+    fireKeyDownSeq('left');
+    expect(state()).toEqual([t, 4]);
+    fireKeyDownSeq('end ctrl+left left shift+ctrl+left');
+    expect(state()).toEqual([t, 4, 6]);
+    fireKeyDownSeq('right');
+    expect(state()).toEqual([t, 6]);
+
+    fireKeyDownSeq('home ctrl+right right shift+ctrl+right');
+    expect(state()).toEqual([t, 6, 4]);
+    fireKeyDownSeq('left');
+    expect(state()).toEqual([t, 4]);
+    fireKeyDownSeq('home ctrl+right right shift+ctrl+right');
+    expect(state()).toEqual([t, 6, 4]);
+    fireKeyDownSeq('right');
+    expect(state()).toEqual([t, 6]);
+  });
+
+  it('select, then ctrl+arrow', function() {
+    var t = ' aa bb cc ';
+    type(t);
+
+    fireKeyDownSeq('end ctrl+left left shift+ctrl+left');
+    expect(state()).toEqual([t, 4, 6]);
+    fireKeyDownSeq('ctrl+left');
+    expect(state()).toEqual([t, 1]);
+    fireKeyDownSeq('end ctrl+left left shift+ctrl+left');
+    expect(state()).toEqual([t, 4, 6]);
+    fireKeyDownSeq('ctrl+right');
+    expect(state()).toEqual([t, 9]);
+
+    fireKeyDownSeq('home ctrl+right right shift+ctrl+right');
+    expect(state()).toEqual([t, 6, 4]);
+    fireKeyDownSeq('ctrl+left');
+    expect(state()).toEqual([t, 1]);
+    fireKeyDownSeq('home ctrl+right right shift+ctrl+right');
+    expect(state()).toEqual([t, 6, 4]);
+    fireKeyDownSeq('ctrl+right');
+    expect(state()).toEqual([t, 9]);
+  });
+
+  it('select, then home/end', function() {
+    var t = ' ab ';
+    type(t);
+
+    fireKeyDownSeq('shift+left home');
+    expect(state()).toEqual([t, 0]);
+    fireKeyDownSeq('shift+right home');
+    expect(state()).toEqual([t, 0]);
+    fireKeyDownSeq('ctrl+shift+right home');
+    expect(state()).toEqual([t, 0]);
+    fireKeyDownSeq('ctrl+right ctrl+shift+left home');
+    expect(state()).toEqual([t, 0]);
+
+    fireKeyDownSeq('shift+right end');
+    expect(state()).toEqual([t, 4]);
+    fireKeyDownSeq('shift+left end');
+    expect(state()).toEqual([t, 4]);
+    fireKeyDownSeq('ctrl+shift+left end');
+    expect(state()).toEqual([t, 4]);
+    fireKeyDownSeq('ctrl+left ctrl+shift+right end');
+    expect(state()).toEqual([t, 4]);
+  });
+});
+
+// TODO: Test keyboard shortcuts on non-Mac (i.e. ctrlKey instead of metaKey).
+describe('Editor keyboard shortcuts', function() {
+  beforeEach(function() {
+    ed.reset();
+    expect(state()).toEqual(['', 0]);
+  });
+
+  it('select-all', function() {
+    var t = ' aa bb ';
+    type(t);
+    expect(state()).toEqual([t, 7]);
+    fireKeyDownSeq('meta+A');
+    expect(state()).toEqual([t, 0, 7]);
+  });
+
+  it('cut, copy, paste', function() {
+    var t = 'aa bb cc';
+    type(t);
+
+    expect(state()).toEqual([t, 8]);
+    expect(ed.clipboard).toEqual('');
+    fireKeyDownSeq('meta+C meta+X meta+V');
+    expect(state()).toEqual([t, 8]);
+    expect(ed.clipboard).toEqual('');
+
+    fireKeyDownSeq('shift+ctrl+left meta+X');
+    expect(state()).toEqual(['aa bb ', 6]);
+    expect(ed.clipboard).toEqual('cc');
+    fireKeyDownSeq('meta+V');
+    expect(state()).toEqual([t, 8]);
+    expect(ed.clipboard).toEqual('cc');
+
+    fireKeyDownSeq('ctrl+left left shift+ctrl+left meta+C delete');
+    expect(state()).toEqual(['aa  cc', 3]);
+    expect(ed.clipboard).toEqual('bb');
+    fireKeyDownSeq('meta+V');
+    expect(state()).toEqual([t, 5]);
+    expect(ed.clipboard).toEqual('bb');
+
+    fireKeyDownSeq('meta+A meta+C');
+    expect(ed.clipboard).toEqual(t);
+    fireKeyDownSeq('meta+V meta+V');
+    expect(state()).toEqual([t + t, 16]);
+    expect(ed.clipboard).toEqual(t);
+  });
+
+  it('multiple cut/copy commands', function() {
+    var t = 'abcd';
+    type(t);
+    fireKeyDownSeq('shift+left meta+C');
+    expect(state()).toEqual([t, 3, 4]);
+    expect(ed.clipboard).toEqual('d');
+    fireKeyDownSeq('left shift+home meta+C');
+    expect(state()).toEqual([t, 0, 3]);
+    expect(ed.clipboard).toEqual('abc');
+    fireKeyDownSeq('shift+right meta+X');
+    expect(state()).toEqual(['ad', 1]);
+    expect(ed.clipboard).toEqual('bc');
+  });
+
+  it('change selection, then paste', function() {
+    type('ab');
+    fireKeyDownSeq('shift+left meta+C left meta+V');
+    expect(state()).toEqual(['abb', 2]);
+    fireKeyDownSeq('ctrl+shift+left meta+V');
+    expect(state()).toEqual(['bb', 1]);
+  });
+});
+
+describe('Editor mouse', function() {
+  beforeEach(function() {
+    ed.reset();
+    expect(state()).toEqual(['', 0]);
   });
 });
 

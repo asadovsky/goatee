@@ -164,18 +164,21 @@ Editor.prototype.rowFromY = function(y) {
   return row;
 };
 
+Editor.ALPHANUM_RE = /[A-Za-z0-9]/;
+
 Editor.prototype.cursorHop = function(p, forward, hop) {
+  var anre = Editor.ALPHANUM_RE;
   if (forward) {
     if (hop) {
-      while (p < this.text.length && /\s/.test(this.text.charAt(p))) p++;
-      while (p < this.text.length && !/\s/.test(this.text.charAt(p))) p++;
+      while (p < this.text.length && !anre.test(this.text.charAt(p))) p++;
+      while (p < this.text.length && anre.test(this.text.charAt(p))) p++;
     } else if (p < this.text.length) {
       p++;
     }
   } else {  // backward
     if (hop) {
-      while (p > 0 && /\s/.test(this.text.charAt(p - 1))) p--;
-      while (p > 0 && !/\s/.test(this.text.charAt(p - 1))) p--;
+      while (p > 0 && !anre.test(this.text.charAt(p - 1))) p--;
+      while (p > 0 && anre.test(this.text.charAt(p - 1))) p--;
     } else if (p > 0) {
       p--;
     }
@@ -475,6 +478,7 @@ Editor.prototype.handleKeyDown = function(e) {
   if (!this.cursor.hasFocus || this.mouseIsDown) return;
 
   var sel = this.getSelection();
+  // TODO: For Linux and Windows, require ctrlKey instead of metaKey.
   if (e.metaKey) {
     var c = String.fromCharCode(e.which);
     switch (c) {
@@ -492,7 +496,7 @@ Editor.prototype.handleKeyDown = function(e) {
     case 'X':
     case 'C':
       if (sel !== null) {
-        this.clipboard = this.text.substr(sel[0], sel[1]);
+        this.clipboard = this.text.substr(sel[0], sel[1] - sel[0]);
         if (c === 'X') {
           this.deleteSelection();
           this.renderAll();
@@ -539,7 +543,11 @@ Editor.prototype.handleKeyDown = function(e) {
       if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
     } else {
       if (sel !== null) {
-        this.updateCursorFromP(sel[0]);
+        if (e.ctrlKey) {
+          this.updateCursorFromP(this.cursorHop(sel[0], false, true));
+        } else {
+          this.updateCursorFromP(sel[0]);
+        }
         this.clearSelection();
       } else {
         this.updateCursorFromP(
@@ -576,7 +584,11 @@ Editor.prototype.handleKeyDown = function(e) {
       if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
     } else {
       if (sel !== null) {
-        this.updateCursorFromP(sel[1]);
+        if (e.ctrlKey) {
+          this.updateCursorFromP(this.cursorHop(sel[1], true, true));
+        } else {
+          this.updateCursorFromP(sel[1]);
+        }
         this.clearSelection();
       } else {
         this.updateCursorFromP(
