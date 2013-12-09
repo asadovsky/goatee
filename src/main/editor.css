@@ -1,8 +1,13 @@
+#editor,
+#editor * {
+  box-sizing: border-box;
+}
+
 #editor {
   background: #fff;
   border: 1px solid #999;
-  box-sizing: border-box;
   cursor: text;
+  font-family: arial, sans-serif;
   font-size: 16px;
   line-height: 16px;  /* equal to font-size */
   padding: 20px;

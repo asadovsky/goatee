@@ -4,15 +4,22 @@
 //  - http://sinonjs.org/
 //
 // TODO:
-//  - up, down, ctrl+up, ctrl+down
-//  - Hit end key when line does not end in \r
-//  - Rendering
+//  - Add tests where we apply the same operations in textarea and editor, then
+//    compare state
+//  - Add tests for rendering, perhaps using Depicted
+//    https://github.com/bslatkin/dpxdt
 
 'use strict';
 
+// Width and height of 'W' character.
 var W_WIDTH = 15;
 var W_HEIGHT = 18;
 
+// Widths of various other characters.
+var SPACE_WIDTH = 4;
+var T_WIDTH = 10;
+
+// Maps key name to character code.
 var KEY_CODES = {
   'backspace': 8,
   'end': 35,
@@ -84,6 +91,12 @@ var curp = function() {
   return ed.cursor.pos.p;
 };
 
+// Returns the current cursor [p, row, left].
+var curState = function() {
+  var pos = ed.cursor.pos;
+  return [pos.p, pos.row, pos.left];
+};
+
 // Returns the current selection start position, or null if there's no
 // selection.
 var selp = function() {
@@ -98,6 +111,13 @@ var state = function() {
   } else {
     return [text(), curp(), selp()];
   }
+};
+
+// Returns a string containing s repeated n times.
+var repeat = function(s, n) {
+  var res = '';
+  for (var i = 0; i < n; i++) res += s;
+  return res;
 };
 
 describe('Editor keyboard basics', function() {
@@ -118,7 +138,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual(['', 0]);
   });
 
-  it('insert and move', function() {
+  it('insert and left/right', function() {
     fireKeyDownSeq('left right left');
     expect(state()).toEqual(['', 0]);
     type('abc');
@@ -137,6 +157,14 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual(['fgabdec', 2]);
     fireKeyDownSeq('right right left right');
     expect(curp()).toEqual(4);
+
+    // Now with some newline chars.
+    type('h\rij\r');
+    expect(state()).toEqual(['fgabh\rij\rdec', 9]);
+    fireKeyDownSeq('left left left left left');
+    expect(curp()).toEqual(4);
+    fireKeyDownSeq('right right right right right');
+    expect(curp()).toEqual(9);
   });
 
   it('delete/backspace', function() {
@@ -153,7 +181,13 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual(['b', 1]);
     fireKeyDownSeq('backspace');
     expect(state()).toEqual(['', 0]);
-    expect(state()).toEqual(['', 0]);
+
+    // Now with some newline chars.
+    type('h\rij\rk');
+    fireKeyDownSeq('left left left');
+    expect(state()).toEqual(['h\rij\rk', 3]);
+    fireKeyDownSeq('backspace backspace delete delete');
+    expect(state()).toEqual(['hk', 1]);
   });
 
   it('home/end', function() {
@@ -170,7 +204,34 @@ describe('Editor keyboard basics', function() {
     expect(curp()).toEqual(3);
   });
 
-  it('ctrl+arrow', function() {
+  it('home/end with newlines', function() {
+    type('123\r456\r789');
+    expect(curp()).toEqual(11);
+    fireKeyDownSeq('end');
+    expect(curp()).toEqual(11);
+    fireKeyDownSeq('home');
+    expect(curp()).toEqual(8);
+    fireKeyDownSeq('home');
+    expect(curp()).toEqual(8);
+    fireKeyDownSeq('left');
+    expect(curp()).toEqual(7);
+    fireKeyDownSeq('end');
+    expect(curp()).toEqual(7);
+    fireKeyDownSeq('home');
+    expect(curp()).toEqual(4);
+    fireKeyDownSeq('home');
+    expect(curp()).toEqual(4);
+    fireKeyDownSeq('left');
+    expect(curp()).toEqual(3);
+    fireKeyDownSeq('end');
+    expect(curp()).toEqual(3);
+    fireKeyDownSeq('home');
+    expect(curp()).toEqual(0);
+    fireKeyDownSeq('home');
+    expect(curp()).toEqual(0);
+  });
+
+  it('ctrl+left/right', function() {
     var t = 'aa bb  cc';
     type(t);
     expect(state()).toEqual([t, 9]);
@@ -191,21 +252,22 @@ describe('Editor keyboard basics', function() {
     fireKeyDownSeq('ctrl+right');
     expect(state()).toEqual([t, 9]);
 
-    // Non-alphanumeric chars should behave the same way as spaces.
+    // Non-alphanumeric chars (including newlines and periods) should behave the
+    // same way as spaces.
     ed.reset();
-    t = 'aa+/|3a';
+    t = 'aa+/.\r|3a';
     type(t);
-    expect(state()).toEqual([t, 7]);
+    expect(state()).toEqual([t, 9]);
     fireKeyDownSeq('ctrl+left');
-    expect(state()).toEqual([t, 5]);
+    expect(state()).toEqual([t, 7]);
     fireKeyDownSeq('ctrl+left');
     expect(state()).toEqual([t, 0]);
     fireKeyDownSeq('ctrl+right');
     expect(state()).toEqual([t, 2]);
     fireKeyDownSeq('ctrl+right');
-    expect(state()).toEqual([t, 7]);
+    expect(state()).toEqual([t, 9]);
 
-    // Leading and trailing space.
+    // Leading and trailing spaces.
     ed.reset();
     t = '  ';
     type(t);
@@ -253,11 +315,11 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual(['', 0]);
     type(' ');
     expect(curp()).toEqual(1);
-    fireKeyDownSeq('ctrl+backspace');
+    fireKeyDownSeq('home ctrl+delete');
     expect(state()).toEqual(['', 0]);
   });
 
-  it('shift+arrow', function() {
+  it('shift+left/right', function() {
     fireKeyDownSeq('shift+left shift+right shift+left');
     expect(state()).toEqual(['', 0]);
 
@@ -278,8 +340,8 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 0]);
   });
 
-  // Mostly copied from ctrl+arrow test.
-  it('shift+ctrl+arrow', function() {
+  // Mostly copied from ctrl+left/right test.
+  it('shift+ctrl+left/right', function() {
     var t = 'aa bb  cc';
     type(t);
     expect(state()).toEqual([t, 9]);
@@ -308,7 +370,7 @@ describe('Editor keyboard basics', function() {
     fireKeyDownSeq('shift+ctrl+left');
     expect(state()).toEqual([t, 3]);
 
-    // Leading and trailing space.
+    // Leading and trailing spaces.
     ed.reset();
     t = '  ';
     type(t);
@@ -350,7 +412,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual(['afg', 3]);
   });
 
-  it('select, then arrow', function() {
+  it('select, then left/right', function() {
     var t = ' aa bb cc ';
     type(t);
 
@@ -373,7 +435,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 6]);
   });
 
-  it('select, then ctrl+arrow', function() {
+  it('select, then ctrl+left/right', function() {
     var t = ' aa bb cc ';
     type(t);
 
@@ -417,6 +479,219 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 4]);
     fireKeyDownSeq('ctrl+left ctrl+shift+right end');
     expect(state()).toEqual([t, 4]);
+  });
+});
+
+describe('Editor rendering', function() {
+  beforeEach(function() {
+    ed.reset();
+    expect(state()).toEqual(['', 0]);
+  });
+
+  it('innerWidth', function() {
+    // Tests below assume that one line can fit 37 W's.
+    expect(Math.floor(ed.innerWidth / W_WIDTH)).toEqual(37);
+  });
+
+  it('home/end with wrapped line', function() {
+    var t = repeat('W', 50);
+    type(t);
+    expect(state()).toEqual([t, 50]);
+
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([37, 1, 0]);
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([37, 1, 0]);
+    fireKeyDownSeq('left');
+    expect(curState()).toEqual([36, 0, 36 * W_WIDTH]);
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([37, 0, 37 * W_WIDTH]);
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([37, 0, 37 * W_WIDTH]);
+    fireKeyDownSeq('right');
+    expect(curState()).toEqual([38, 1, W_WIDTH]);
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([37, 1, 0]);
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
+
+    // This time, a wrapped line with a space.
+    ed.reset();
+    var w29_w20 = repeat('W', 29) + ' ' + repeat('W', 20);
+    type(w29_w20);
+    expect(state()).toEqual([w29_w20, 50]);
+
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([50, 1, 20 * W_WIDTH]);
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([30, 1, 0]);
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([30, 1, 0]);
+    fireKeyDownSeq('left');
+    expect(curState()).toEqual([29, 0, 29 * W_WIDTH]);
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([30, 0, 29 * W_WIDTH + SPACE_WIDTH]);
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([30, 0, 29 * W_WIDTH + SPACE_WIDTH]);
+    fireKeyDownSeq('right');
+    expect(curState()).toEqual([31, 1, W_WIDTH]);
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([30, 1, 0]);
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([50, 1, 20 * W_WIDTH]);
+  });
+
+  it('up/down', function() {
+    var w10 = repeat('W', 10);
+    type(w10 + '\r' +
+         w10 + w10 + '\r' +
+         w10 + '\r' +
+         '\r' +
+         w10 + w10);
+
+    expect(curState()).toEqual([64, 4, 20 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([43, 3, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([42, 2, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([31, 1, 20 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([10, 0, 10 * W_WIDTH]);
+    // Extra up.
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([10, 0, 10 * W_WIDTH]);
+
+    fireKeyDownSeq('left');
+    expect(curState()).toEqual([9, 0, 9 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([20, 1, 9 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([41, 2, 9 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([43, 3, 0]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([53, 4, 9 * W_WIDTH]);
+    // Extra down.
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([53, 4, 9 * W_WIDTH]);
+
+    fireKeyDownSeq('home');
+    expect(curState()).toEqual([44, 4, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([43, 3, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([32, 2, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([11, 1, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([0, 0, 0]);
+  });
+
+  it('up/down with wrapped line', function() {
+    var w10 = repeat('W', 10);
+    var w50 = repeat('W', 50);
+    type(w50 + '\r\r' + w50 + '\r' + w10);
+
+    expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([52 + 37 + 10, 4, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([52 + 10, 3, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([51, 2, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([37 + 10, 1, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([10, 0, 10 * W_WIDTH]);
+
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([37, 0, 37 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([51, 2, 0]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([52 + 37, 3, 37 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([52 + 50, 4, 13 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
+
+    // This time, a wrapped line with a space.
+    ed.reset();
+    var w10 = repeat('W', 10);
+    var w29_w18_w = repeat('W', 29) + ' ' + repeat('W', 18) + ' ' + 'W';
+    type(w29_w18_w + '\r\r' + w29_w18_w + '\r' + w10);
+
+    expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([52 + 30 + 10, 4, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([52 + 10, 3, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([51, 2, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([30 + 10, 1, 10 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([10, 0, 10 * W_WIDTH]);
+
+    fireKeyDownSeq('end');
+    expect(curState()).toEqual([30, 0, 29 * W_WIDTH + SPACE_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([50, 1, 19 * W_WIDTH + SPACE_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([51, 2, 0]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([52 + 30, 3, 29 * W_WIDTH + SPACE_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([52 + 50, 4, 19 * W_WIDTH + SPACE_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
+  });
+
+  it('up/down with chars of different widths', function() {
+    type('W\rTT\rW \rTW\r    \rW\r');
+    // This test relies on the following invariants.
+    expect(T_WIDTH * 1.5).toEqual(W_WIDTH);
+    expect(SPACE_WIDTH * 2.5).toEqual(T_WIDTH);
+    // Initial cursor left is 0px.
+    expect(curState()).toEqual([18, 6, 0]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([16, 5, 0]);
+    fireKeyDownSeq('end');
+    // Now, cursor left is 15px.
+    expect(curState()).toEqual([17, 5, W_WIDTH]);
+    fireKeyDownSeq('up');
+    // 16px is closer than 12px.
+    expect(curState()).toEqual([15, 4, 4 * SPACE_WIDTH]);
+    fireKeyDownSeq('up');
+    // 10px is closer than 25px.
+    expect(curState()).toEqual([9, 3, T_WIDTH]);
+    fireKeyDownSeq('down');
+    // prevLeft should still be 15px (i.e. W_WIDTH).
+    expect(curState()).toEqual([15, 4, 4 * SPACE_WIDTH]);
+    fireKeyDownSeq('up up');
+    expect(curState()).toEqual([6, 2, W_WIDTH]);
+    fireKeyDownSeq('up');
+    // 10px is closer than 20px (lower number wins ties).
+    expect(curState()).toEqual([3, 1, T_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([1, 0, W_WIDTH]);
+    fireKeyDownSeq('down home right down');
+    expect(curState()).toEqual([6, 2, W_WIDTH]);
+    fireKeyDownSeq('down down');
+    // This time, prevLeft is 10px (i.e. T_WIDTH).
+    // 8px is closer than 12px (lower number wins ties).
+    expect(curState()).toEqual([13, 4, 2 * SPACE_WIDTH]);
+    fireKeyDownSeq('down down down');
+    expect(curState()).toEqual([18, 6, 0]);
+  });
+
+  it('ctrl+up/down', function() {
+    // TODO
   });
 });
 
