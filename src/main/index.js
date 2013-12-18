@@ -75,7 +75,7 @@ socket.onmessage = function(event) {
   console.assert(newBaseTxnId === baseTxnId + 1);
   baseTxnId = newBaseTxnId;
 
-  // If op is from this client, send all buffered ops to server.
+  // If txn is from this client, send all buffered ops to server.
   // Otherwise, transform it against all buffered ops and then apply it.
   if (msg['ClientId'] === clientId) {
     ackedClientOpIdx = sentClientOpIdx;

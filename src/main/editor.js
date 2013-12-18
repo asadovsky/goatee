@@ -43,13 +43,22 @@ HtmlSizer.prototype.height = function(html) {
 };
 
 var CursorPos = function(p, row, left) {
-  this.p = p;        // in [0, text.length]
-  this.row = row;    // row (line number), used for up/down arrow keys
-  this.left = left;  // left position, in pixels
+  this.p = p;  // in [0, text.length]
+
+  // If true, cursor should be rendered to the right of the char at offset p-1,
+  // rather than at the left edge of the char at offset p. This can happen when
+  // user presses the "end" key or clicks past the end of a line.
+  this.append = false;
 
   // Used for tracking previous left position, needed to implement up and down
   // arrow keys.
   this.prevLeft = null;
+
+  // Used for rendering. Technically not part of state (i.e. can be derived from
+  // state), but kept up-to-date for performance and implementation simplicity
+  // reasons.
+  this.row = row;    // row (line number)
+  this.left = left;  // left position, in pixels
 };
 
 CursorPos.prototype.copy = function() {
@@ -215,9 +224,13 @@ Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
   }
 
   this.cursor.pos.p = p;
+  // If the character at position p is actually on the next line, switch cursor
+  // rendering to "append" mode.
+  this.cursor.pos.append = (p === beginEnd[1]);
+  if (clearPrevLeft) this.cursor.pos.prevLeft = null;
+
   this.cursor.pos.row = row;
   this.cursor.pos.left = left;
-  if (clearPrevLeft) this.cursor.pos.prevLeft = null;
 };
 
 // Updates cursor state given p (offset).
@@ -235,9 +248,11 @@ Editor.prototype.updateCursorFromP = function(p) {
   }
 
   this.cursor.pos.p = p;
+  this.cursor.pos.append = false;
+  this.cursor.pos.prevLeft = null;
+
   this.cursor.pos.row = row;
   this.cursor.pos.left = left;
-  this.cursor.pos.prevLeft = null;
 };
 
 Editor.escapeCharMap = {
@@ -694,11 +709,10 @@ Editor.prototype.handleMouseMove = function(e) {
   var y = viewportY - innerRect.top;
   this.updateCursorFromRowAndX(this.rowFromY(y), x, true);
   if (this.cursor.pos.p === this.cursor.sel.p) {
-    // Mouse is down, with 0 chars selected. Use row and left from start of
+    // Mouse is down, with 0 chars selected. Copy CursorPos from start of
     // selection so that this location is used for rendering the cursor even if
     // it's EOL.
-    this.cursor.pos.row = this.cursor.sel.row;
-    this.cursor.pos.left = this.cursor.sel.left;
+    this.cursor.pos = this.cursor.sel.copy();
   }
   this.renderSelectionAndCursor();
 };
