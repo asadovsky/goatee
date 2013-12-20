@@ -1,4 +1,4 @@
-// Tests and benchmarks for Text.
+// Tests and benchmarks for text OT.
 //
 // To run tests:
 //   go test ot

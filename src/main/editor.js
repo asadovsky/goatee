@@ -3,6 +3,8 @@
 //
 // TODO:
 //  - Support OT insert/delete text ops and cursor/selection ops
+//  - For performance of insert and delete ops, represent text using something
+//    like https://github.com/josephg/jumprope
 //  - Make select-scroll smooth
 //  - Support bold, italics
 //  - Support font-size and line-height
@@ -225,7 +227,7 @@ Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
 
   this.cursor.pos.p = p;
   // If the character at position p is actually on the next line, switch cursor
-  // rendering to "append" mode.
+  // state to "append" mode.
   this.cursor.pos.append = (p === beginEnd[1]);
   if (clearPrevLeft) this.cursor.pos.prevLeft = null;
 
