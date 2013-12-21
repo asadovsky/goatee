@@ -1,5 +1,4 @@
-// Defines HtmlSizer, Cursor, and Editor classes, and constructs an Editor
-// instance for the #editor div.
+// Defines Editor class as well as some private classes.
 //
 // TODO:
 //  - Support OT insert/delete text ops and cursor/selection ops
@@ -9,42 +8,44 @@
 //  - Support bold, italics
 //  - Support font-size and line-height
 //  - Support non-ASCII characters
-//  - Make objects and methods private as appropriate
 //  - Fancier cut/copy/paste, see http://goo.gl/Xv1YcG
 //  - Support screen scaling
 
 'use strict';
 
-var DEBUG = 0;
+var ed = ed || {};
+
+ed.DEBUG = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Data structures
 
-var HtmlSizer = function(parentEl) {
-  this.el = document.createElement('div');
-  this.el.style.position = 'fixed';
-  this.el.style.top = '-1000px';
-  this.el.style.left = '-1000px';
-  this.el.style.visibilty = 'hidden';
-  parentEl.appendChild(this.el);
+ed.HtmlSizer_ = function(parentEl) {
+  this.el_ = document.createElement('div');
+  this.el_.style.position = 'fixed';
+  this.el_.style.top = '-1000px';
+  this.el_.style.left = '-1000px';
+  this.el_.style.visibilty = 'hidden';
+  parentEl.appendChild(this.el_);
 };
 
-HtmlSizer.prototype.size = function(html) {
-  this.el.innerHTML = html;
-  var res = [this.el.offsetWidth, this.el.offsetHeight];
-  this.el.innerHTML = '';
+ed.HtmlSizer_.prototype.size = function(html) {
+  this.el_.innerHTML = html;
+  var res = [this.el_.offsetWidth, this.el_.offsetHeight];
+  this.el_.innerHTML = '';
   return res;
 };
 
-HtmlSizer.prototype.width = function(html) {
+ed.HtmlSizer_.prototype.width = function(html) {
   return this.size(html)[0];
 };
 
-HtmlSizer.prototype.height = function(html) {
+ed.HtmlSizer_.prototype.height = function(html) {
   return this.size(html)[1];
 };
 
-var CursorPos = function(p, row, left) {
+// Struct for cursor position data.
+ed.CursorPos_ = function(p, row, left) {
   this.p = p;  // in [0, text.length]
 
   // If true, cursor should be rendered to the right of the char at offset p-1,
@@ -63,51 +64,51 @@ var CursorPos = function(p, row, left) {
   this.left = left;  // left position, in pixels
 };
 
-CursorPos.prototype.copy = function() {
-  return new CursorPos(this.p, this.row, this.left);
+ed.CursorPos_.prototype.copy = function() {
+  return new ed.CursorPos_(this.p, this.row, this.left);
 };
 
-var Cursor = function() {
-  this.pos = new CursorPos(0, 0, 0);
+ed.Cursor_ = function() {
+  this.pos = new ed.CursorPos_(0, 0, 0);
   this.sel = null;  // start pos of selection, or null if no selection
 
   this.hasFocus = true;  // whether the editor has focus
-  this.blinkTimer = 0;
+  this.blinkTimer_ = 0;
 
-  this.el = document.createElement('div');
-  this.el.className = 'cursor';
+  this.el_ = document.createElement('div');
+  this.el_.className = 'cursor';
 
   window.setInterval((function() {
-    if (!this.hasFocus || this.blinkTimer === -1) return;
-    this.blinkTimer = (this.blinkTimer + 1) % 10;
+    if (!this.hasFocus || this.blinkTimer_ === -1) return;
+    this.blinkTimer_ = (this.blinkTimer_ + 1) % 10;
     // Visible 60% of the time, hidden 40% of the time.
-    this.el.style.visibility = (this.blinkTimer < 6) ? 'visible' : 'hidden';
+    this.el_.style.visibility = (this.blinkTimer_ < 6) ? 'visible' : 'hidden';
   }).bind(this), 100);
 };
 
 // Here, bottom means "distance from top of editor to bottom of cursor".
-Cursor.prototype.renderInternal = function(left, bottom, height) {
-  if (DEBUG) console.log(this.pos, this.sel, this.hasFocus);
-  if (DEBUG) console.log(left, bottom, height);
+ed.Cursor_.prototype.render = function(left, bottom, height) {
+  if (ed.DEBUG) console.log(this.pos, this.sel, this.hasFocus);
+  if (ed.DEBUG) console.log(left, bottom, height);
 
-  this.el.style.left = left + 'px';
-  this.el.style.top = bottom - height + 'px';
-  this.el.style.height = height + 'px';
+  this.el_.style.left = left + 'px';
+  this.el_.style.top = bottom - height + 'px';
+  this.el_.style.height = height + 'px';
 
   if (!this.hasFocus) {
-    this.el.style.visibility = 'hidden';
+    this.el_.style.visibility = 'hidden';
   } else if (this.sel !== null) {
-    this.blinkTimer = -1;
-    this.el.style.visibility = (
+    this.blinkTimer_ = -1;
+    this.el_.style.visibility = (
       this.pos.p === this.sel.p ? 'visible' : 'hidden');
   } else {
-    this.blinkTimer = 0;
-    this.el.style.visibility = 'visible';
+    this.blinkTimer_ = 0;
+    this.el_.style.visibility = 'visible';
   }
 
   // If the cursor is not in the window, scroll the window.
   var wTop = window.pageYOffset, wBottom = wTop + window.innerHeight;
-  var cRect = this.el.getBoundingClientRect();
+  var cRect = this.el_.getBoundingClientRect();
   var cTop = wTop + cRect.top, cBottom = wTop + cRect.bottom;
   if (cTop < wTop + 10) {
     window.scrollBy(0, -(wTop - cTop + 100));
@@ -116,80 +117,75 @@ Cursor.prototype.renderInternal = function(left, bottom, height) {
   }
 };
 
-var Editor = function(editorEl) {
-  this.el = editorEl;
+ed.Editor = function(editorEl) {
+  this.el_ = editorEl;
   this.reset();
 
   // Finally, set up listeners to handle user input events.
-  this.boundHandleMouseMove = this.handleMouseMove.bind(this);
-  document.addEventListener('keypress', this.handleKeyPress.bind(this));
-  document.addEventListener('keydown', this.handleKeyDown.bind(this));
-  document.addEventListener('mousedown', this.handleMouseDown.bind(this));
-  document.addEventListener('mouseup', this.handleMouseUp.bind(this));
+  this.boundHandleMouseMove_ = this.handleMouseMove_.bind(this);
+  document.addEventListener('keypress', this.handleKeyPress_.bind(this));
+  document.addEventListener('keydown', this.handleKeyDown_.bind(this));
+  document.addEventListener('mousedown', this.handleMouseDown_.bind(this));
+  document.addEventListener('mouseup', this.handleMouseUp_.bind(this));
 };
 
-Editor.prototype.reset = function() {
-  this.clipboard = '';
-  this.cursor = new Cursor();
-  this.mouseIsDown = false;
+ed.Editor.prototype.reset = function() {
+  this.clipboard_ = '';
+  this.cursor_ = new ed.Cursor_();
+  this.mouseIsDown_ = false;
 
-  // Updated by insertText and deleteText.
-  this.text = '';
-  this.charSizes = [];       // array of [width, height]
-  // Updated by renderAll.
-  this.linePOffsets = null;  // array of [beginP, endP]
-  this.lineYOffsets = null;  // array of [begin, end] px relative to window top
+  // Updated by insertText_ and deleteText_.
+  this.text_ = '';
+  this.charSizes_ = [];       // array of [width, height]
+  // Updated by renderAll_.
+  this.linePOffsets_ = null;  // array of [beginP, endP]
+  this.lineYOffsets_ = null;  // array of [begin, end] px relative to window top
 
-  this.textEl = document.createElement('div');
-  this.innerEl = document.createElement('div');
-  this.innerEl.id = 'editor-inner';
-  this.innerEl.appendChild(this.textEl);
-  this.innerEl.appendChild(this.cursor.el);
+  this.textEl_ = document.createElement('div');
+  this.innerEl_ = document.createElement('div');
+  this.innerEl_.id = 'editor-inner';
+  this.innerEl_.appendChild(this.textEl_);
+  this.innerEl_.appendChild(this.cursor_.el_);
 
   // Remove any existing children, then add innerEl.
-  while (this.el.firstChild) this.el.removeChild(this.el.firstChild);
-  this.el.appendChild(this.innerEl);
-  this.hs = new HtmlSizer(this.el);
+  while (this.el_.firstChild) this.el_.removeChild(this.el_.firstChild);
+  this.el_.appendChild(this.innerEl_);
+  this.hs_ = new ed.HtmlSizer_(this.el_);
 
   // Set fields that depend on DOM.
-  this.innerWidth = parseInt(window.getComputedStyle(
-    this.innerEl, null).getPropertyValue('width'), 10);
-  // Used by handleMouseDown.
-  this.padding = parseInt(window.getComputedStyle(
-    this.el, null).getPropertyValue('padding'), 10);
-  this.border = parseInt(window.getComputedStyle(
-    this.el, null).getPropertyValue('border-width'), 10);
+  this.innerWidth_ = parseInt(window.getComputedStyle(
+    this.innerEl_, null).getPropertyValue('width'), 10);
 
-  this.renderAll();
+  this.renderAll_();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Utility methods
 
-Editor.prototype.rowFromY = function(y) {
+ed.Editor.prototype.rowFromY_ = function(y) {
   var row;
   // TODO: Use binary search.
-  for (row = 0; row < this.lineYOffsets.length - 1; row++) {
-    if (y <= this.lineYOffsets[row][1]) break;
+  for (row = 0; row < this.lineYOffsets_.length - 1; row++) {
+    if (y <= this.lineYOffsets_[row][1]) break;
   }
   return row;
 };
 
-Editor.ALPHANUM_RE = /[A-Za-z0-9]/;
+ed.Editor.ALPHANUM_RE_ = /[A-Za-z0-9]/;
 
-Editor.prototype.cursorHop = function(p, forward, hop) {
-  var anre = Editor.ALPHANUM_RE;
+ed.Editor.prototype.cursorHop_ = function(p, forward, hop) {
+  var anre = ed.Editor.ALPHANUM_RE_;
   if (forward) {
     if (hop) {
-      while (p < this.text.length && !anre.test(this.text.charAt(p))) p++;
-      while (p < this.text.length && anre.test(this.text.charAt(p))) p++;
-    } else if (p < this.text.length) {
+      while (p < this.text_.length && !anre.test(this.text_.charAt(p))) p++;
+      while (p < this.text_.length && anre.test(this.text_.charAt(p))) p++;
+    } else if (p < this.text_.length) {
       p++;
     }
   } else {  // backward
     if (hop) {
-      while (p > 0 && !anre.test(this.text.charAt(p - 1))) p--;
-      while (p > 0 && anre.test(this.text.charAt(p - 1))) p--;
+      while (p > 0 && !anre.test(this.text_.charAt(p - 1))) p--;
+      while (p > 0 && anre.test(this.text_.charAt(p - 1))) p--;
     } else if (p > 0) {
       p--;
     }
@@ -200,20 +196,20 @@ Editor.prototype.cursorHop = function(p, forward, hop) {
 ////////////////////////////////////////////////////////////////////////////////
 // Model update methods
 
-// Some of these (e.g. insertText) also update data needed only for rendering,
+// Some of these (e.g. insertText_) also update data needed only for rendering,
 // for efficiency purposes.
 
 // Updates cursor state given row and x position (in pixels).
 // Assumes text, charSizes, linePOffsets, etc. are up-to-date.
-Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
+ed.Editor.prototype.updateCursorFromRowAndX_ = function(row, x, clearPrevLeft) {
   // Find char whose left is closest to x.
-  var beginEnd = this.linePOffsets[row];
+  var beginEnd = this.linePOffsets_[row];
   var pEnd = beginEnd[1];
-  if (pEnd > 0 && this.text.charAt(pEnd - 1) === '\r') pEnd--;
+  if (pEnd > 0 && this.text_.charAt(pEnd - 1) === '\r') pEnd--;
 
   var p = beginEnd[0], left = 0;
   for (; p < pEnd; p++) {
-    var newLeft = left + this.charSizes[p][0];
+    var newLeft = left + this.charSizes_[p][0];
     if (newLeft >= x) {
       // Pick between left and newLeft.
       if (newLeft - x < x - left) {
@@ -225,39 +221,39 @@ Editor.prototype.updateCursorFromRowAndX = function(row, x, clearPrevLeft) {
     left = newLeft;
   }
 
-  this.cursor.pos.p = p;
+  this.cursor_.pos.p = p;
   // If the character at position p is actually on the next line, switch cursor
   // state to "append" mode.
-  this.cursor.pos.append = (p === beginEnd[1]);
-  if (clearPrevLeft) this.cursor.pos.prevLeft = null;
+  this.cursor_.pos.append = (p === beginEnd[1]);
+  if (clearPrevLeft) this.cursor_.pos.prevLeft = null;
 
-  this.cursor.pos.row = row;
-  this.cursor.pos.left = left;
+  this.cursor_.pos.row = row;
+  this.cursor_.pos.left = left;
 };
 
 // Updates cursor state given p (offset).
 // Assumes text, charSizes, linePOffsets, etc. are up-to-date.
-Editor.prototype.updateCursorFromP = function(p) {
-  var numRows = this.linePOffsets.length;
+ed.Editor.prototype.updateCursorFromP_ = function(p) {
+  var numRows = this.linePOffsets_.length;
   var row = 0;
   // TODO: Use binary search.
   for (; row < numRows - 1; row++) {
-    if (p < this.linePOffsets[row][1]) break;
+    if (p < this.linePOffsets_[row][1]) break;
   }
   var left = 0;
-  for (var q = this.linePOffsets[row][0]; q < p; q++) {
-    left += this.charSizes[q][0];
+  for (var q = this.linePOffsets_[row][0]; q < p; q++) {
+    left += this.charSizes_[q][0];
   }
 
-  this.cursor.pos.p = p;
-  this.cursor.pos.append = false;
-  this.cursor.pos.prevLeft = null;
+  this.cursor_.pos.p = p;
+  this.cursor_.pos.append = false;
+  this.cursor_.pos.prevLeft = null;
 
-  this.cursor.pos.row = row;
-  this.cursor.pos.left = left;
+  this.cursor_.pos.row = row;
+  this.cursor_.pos.left = left;
 };
 
-Editor.escapeCharMap = {
+ed.Editor.ESCAPE_CHAR_MAP_ = {
   ' ': '&nbsp;',
   '"': '&quot;',
   '&': '&amp;',
@@ -265,14 +261,14 @@ Editor.escapeCharMap = {
   '>': '&gt;'
 };
 
-Editor.escapeChar = function(c) {
-  var x = Editor.escapeCharMap[c];
+ed.Editor.escapeChar_ = function(c) {
+  var x = ed.Editor.ESCAPE_CHAR_MAP_[c];
   return x ? x : c;
 };
 
 // Generates html for the given line of text, assuming the text starts at
 // position p.
-Editor.prototype.makeLineHtml = function(text, p) {
+ed.Editor.prototype.makeLineHtml_ = function(text, p) {
   var res = '';
   var len = text.length;
   for (var i = 0; i < len; i++) {
@@ -280,7 +276,7 @@ Editor.prototype.makeLineHtml = function(text, p) {
     if (c === '\r') {
       c = '';
     } else {
-      c = Editor.escapeChar(c);
+      c = ed.Editor.escapeChar_(c);
     }
     console.assert(!/\s/.test(c));
     res += c;
@@ -289,74 +285,74 @@ Editor.prototype.makeLineHtml = function(text, p) {
 };
 
 // Updates text, charSizes, and cursor offset. Other cursor state (row and left)
-// must be updated by renderAll, since that's where we update linePOffsets and
+// must be updated by renderAll_, since that's where we update linePOffsets and
 // lineYOffsets.
-Editor.prototype.insertText = function(p, value) {
-  this.text = this.text.substr(0, p) + value + this.text.substr(p);
+ed.Editor.prototype.insertText_ = function(p, value) {
+  this.text_ = this.text_.substr(0, p) + value + this.text_.substr(p);
   var valueCharSizes = new Array(value.length);
   for (var i = 0; i < value.length; i++) {
     var c = value.charAt(i);
-    valueCharSizes[i] = this.hs.size(this.makeLineHtml(c, p + i));
+    valueCharSizes[i] = this.hs_.size(this.makeLineHtml_(c, p + i));
   }
-  this.charSizes = this.charSizes.slice(0, p).concat(
-    valueCharSizes, this.charSizes.slice(p));
-  this.cursor.pos.p += value.length;
+  this.charSizes_ = this.charSizes_.slice(0, p).concat(
+    valueCharSizes, this.charSizes_.slice(p));
+  this.cursor_.pos.p += value.length;
 };
 
-// See comment for insertText.
-Editor.prototype.deleteText = function(p, len) {
-  this.text = this.text.substr(0, p) + this.text.substr(p + len);
-  this.charSizes.splice(p, len);
-  this.cursor.pos.p = p;
+// See comment for insertText_.
+ed.Editor.prototype.deleteText_ = function(p, len) {
+  this.text_ = this.text_.substr(0, p) + this.text_.substr(p + len);
+  this.charSizes_.splice(p, len);
+  this.cursor_.pos.p = p;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Selection-specific model update methods
 
-Editor.prototype.getSelection = function() {
-  if (this.cursor.sel === null || this.cursor.pos.p === this.cursor.sel.p) {
+ed.Editor.prototype.getSelection_ = function() {
+  if (this.cursor_.sel === null || this.cursor_.pos.p === this.cursor_.sel.p) {
     return null;
-  } else if (this.cursor.pos.p < this.cursor.sel.p) {
-    return [this.cursor.pos.p, this.cursor.sel.p];
+  } else if (this.cursor_.pos.p < this.cursor_.sel.p) {
+    return [this.cursor_.pos.p, this.cursor_.sel.p];
   } else {
-    return [this.cursor.sel.p, this.cursor.pos.p];
+    return [this.cursor_.sel.p, this.cursor_.pos.p];
   }
 };
 
-Editor.prototype.clearSelection = function() {
-  this.cursor.sel = null;
+ed.Editor.prototype.clearSelection_ = function() {
+  this.cursor_.sel = null;
 };
 
-// See comment for insertText.
-Editor.prototype.deleteSelection = function() {
-  var sel = this.getSelection();
+// See comment for insertText_.
+ed.Editor.prototype.deleteSelection_ = function() {
+  var sel = this.getSelection_();
   console.assert(sel !== null);
-  this.deleteText(sel[0], sel[1] - sel[0]);
-  this.cursor.sel = null;
+  this.deleteText_(sel[0], sel[1] - sel[0]);
+  this.cursor_.sel = null;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pure rendering methods
 
-Editor.prototype.renderCursor = function() {
-  var beginEnd = this.lineYOffsets[this.cursor.pos.row];
-  this.cursor.renderInternal(
-    this.cursor.pos.left, beginEnd[1], beginEnd[1] - beginEnd[0]);
+ed.Editor.prototype.renderCursor_ = function() {
+  var beginEnd = this.lineYOffsets_[this.cursor_.pos.row];
+  this.cursor_.render(
+    this.cursor_.pos.left, beginEnd[1], beginEnd[1] - beginEnd[0]);
 };
 
-Editor.prototype.renderSelectionAndCursor = function() {
-  var els = this.textEl.querySelectorAll('.highlight');
+ed.Editor.prototype.renderSelectionAndCursor_ = function() {
+  var els = this.textEl_.querySelectorAll('.highlight');
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
     el.parentNode.removeChild(el);
   }
 
-  var sel = this.getSelection();
+  var sel = this.getSelection_();
   if (sel !== null) {
-    var numRows = this.linePOffsets.length;
-    console.assert(numRows === this.textEl.children.length);
+    var numRows = this.linePOffsets_.length;
+    console.assert(numRows === this.textEl_.children.length);
     for (var row = 0; row < numRows; row++) {
-      var beginEnd = this.linePOffsets[row];
+      var beginEnd = this.linePOffsets_[row];
       if (sel[0] >= beginEnd[1]) continue;
       if (sel[1] <= beginEnd[0]) break;
 
@@ -365,25 +361,25 @@ Editor.prototype.renderSelectionAndCursor = function() {
 
       // Compute left.
       var p = beginEnd[0], left = 0;
-      for (; p < sel[0]; p++) left += this.charSizes[p][0];
+      for (; p < sel[0]; p++) left += this.charSizes_[p][0];
       el.style.left = left + 'px';
 
       // Compute right (or width).
       if (sel[1] > beginEnd[1] ||
           (sel[1] === beginEnd[1] &&
-           this.text.charAt(beginEnd[1] - 1) === '\r')) {
+           this.text_.charAt(beginEnd[1] - 1) === '\r')) {
         el.style.right = '0';
       } else {
         var width = 0;
-        for (; p < sel[1]; p++) width += this.charSizes[p][0];
+        for (; p < sel[1]; p++) width += this.charSizes_[p][0];
         el.style.width = width + 'px';
       }
 
-      this.textEl.children[row].appendChild(el);
+      this.textEl_.children[row].appendChild(el);
     }
   }
 
-  this.renderCursor();
+  this.renderCursor_();
 };
 
 // Renders text, selection, and cursor.
@@ -391,11 +387,11 @@ Editor.prototype.renderSelectionAndCursor = function() {
 //  - Build html and array of line p-offsets, based on char widths
 //  - Build array of line y-offsets
 //  - Process arrays to place cursor
-Editor.prototype.renderAll = function() {
-  console.assert(this.charSizes.length === this.text.length);
+ed.Editor.prototype.renderAll_ = function() {
+  console.assert(this.charSizes_.length === this.text_.length);
 
   // Global state.
-  this.linePOffsets = [];
+  this.linePOffsets_ = [];
   var html = '';  // final html string
   var row = 0;    // current line number
 
@@ -408,15 +404,15 @@ Editor.prototype.renderAll = function() {
   // Apply word-wrap: add chars one by one until too wide, figure out where to
   // add a newline, add it, then rinse and repeat.
   var p = 0;
-  while (p < this.text.length) {
-    var c = this.text.charAt(p);
+  while (p < this.text_.length) {
+    var c = this.text_.charAt(p);
     lineText += c;
     if (c === '\r') {
       p++;
     } else {
-      lineWidth += this.charSizes[p][0];
+      lineWidth += this.charSizes_[p][0];
       if (c === ' ') lineLastSpace = p - lineBegin;
-      if (lineWidth <= this.innerWidth) {
+      if (lineWidth <= this.innerWidth_) {
         p++;
         continue;
       } else {
@@ -431,8 +427,8 @@ Editor.prototype.renderAll = function() {
       }
     }
     // Update global state.
-    this.linePOffsets[row] = [lineBegin, p];
-    html += this.makeLineHtml(lineText, lineBegin);
+    this.linePOffsets_[row] = [lineBegin, p];
+    html += this.makeLineHtml_(lineText, lineBegin);
     row++;
     // Reset per-line state.
     lineText = '';
@@ -441,38 +437,38 @@ Editor.prototype.renderAll = function() {
     lineLastSpace = -1;
   }
   // Add last line.
-  console.assert(p === this.text.length);
-  this.linePOffsets[row] = [lineBegin, p];
-  html += this.makeLineHtml(lineText, lineBegin);
+  console.assert(p === this.text_.length);
+  this.linePOffsets_[row] = [lineBegin, p];
+  html += this.makeLineHtml_(lineText, lineBegin);
 
-  this.textEl.innerHTML = html;
+  this.textEl_.innerHTML = html;
 
   // Compute lineYOffsets.
-  this.lineYOffsets = new Array(numRows);
-  var numRows = this.linePOffsets.length;
+  this.lineYOffsets_ = new Array(numRows);
+  var numRows = this.linePOffsets_.length;
   var beginPx = 0;
-  var emptyLineHeight = this.hs.height(this.makeLineHtml('', p));
+  var emptyLineHeight = this.hs_.height(this.makeLineHtml_('', p));
   for (var row = 0; row < numRows; row++) {
     var lineHeight = emptyLineHeight;
-    var beginEnd = this.linePOffsets[row];
+    var beginEnd = this.linePOffsets_[row];
     for (var p = beginEnd[0]; p < beginEnd[1]; p++) {
-      lineHeight = Math.max(lineHeight, this.charSizes[p][1]);
+      lineHeight = Math.max(lineHeight, this.charSizes_[p][1]);
     }
-    this.lineYOffsets[row] = [beginPx, beginPx + lineHeight];
+    this.lineYOffsets_[row] = [beginPx, beginPx + lineHeight];
     beginPx += lineHeight;
   }
 
   // Now that we've updated linePOffsets and lineYOffsets, we can update cursor
   // row and left.
-  this.updateCursorFromP(this.cursor.pos.p);
-  this.renderSelectionAndCursor();
+  this.updateCursorFromP_(this.cursor_.pos.p);
+  this.renderSelectionAndCursor_();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Input handlers
 
 // We ignore these keypress codes.
-Editor.ignore = {
+ed.Editor.IGNORE_KEYPRESS_ = {
   63232: true,  // ctrl up
   63233: true,  // ctrl down
   63234: true,  // ctrl left
@@ -480,43 +476,43 @@ Editor.ignore = {
   63272: true   // ctrl delete
 };
 
-Editor.prototype.handleKeyPress = function(e) {
-  if (!this.cursor.hasFocus || this.mouseIsDown) return;
+ed.Editor.prototype.handleKeyPress_ = function(e) {
+  if (!this.cursor_.hasFocus || this.mouseIsDown_) return;
 
-  if (Editor.ignore[e.which]) return;
+  if (ed.Editor.IGNORE_KEYPRESS_[e.which]) return;
   if (e.which > 127) return;  // require ASCII for now
   e.preventDefault();
-  if (this.cursor.sel !== null) this.deleteSelection();
-  this.insertText(this.cursor.pos.p, String.fromCharCode(e.which));
-  this.renderAll();
+  if (this.cursor_.sel !== null) this.deleteSelection_();
+  this.insertText_(this.cursor_.pos.p, String.fromCharCode(e.which));
+  this.renderAll_();
 };
 
-Editor.prototype.handleKeyDown = function(e) {
-  if (!this.cursor.hasFocus || this.mouseIsDown) return;
+ed.Editor.prototype.handleKeyDown_ = function(e) {
+  if (!this.cursor_.hasFocus || this.mouseIsDown_) return;
 
-  var sel = this.getSelection();
+  var sel = this.getSelection_();
   // TODO: For Linux and Windows, require ctrlKey instead of metaKey.
   if (e.metaKey) {
     var c = String.fromCharCode(e.which);
     switch (c) {
     case 'V':
-      if (sel !== null) this.deleteSelection();
-      this.insertText(this.cursor.pos.p, this.clipboard);
-      this.renderAll();
+      if (sel !== null) this.deleteSelection_();
+      this.insertText_(this.cursor_.pos.p, this.clipboard_);
+      this.renderAll_();
       break;
     case 'A':
-      this.cursor.sel = new CursorPos(this.text.length, null, null);
-      this.updateCursorFromP(0);
-      if (this.cursor.sel.p === this.cursor.pos.p) this.cursor.sel = null;
-      this.renderSelectionAndCursor();
+      this.cursor_.sel = new ed.CursorPos_(this.text_.length, null, null);
+      this.updateCursorFromP_(0);
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.cursor_.sel = null;
+      this.renderSelectionAndCursor_();
       break;
     case 'X':
     case 'C':
       if (sel !== null) {
-        this.clipboard = this.text.substr(sel[0], sel[1] - sel[0]);
+        this.clipboard_ = this.text_.substr(sel[0], sel[1] - sel[0]);
         if (c === 'X') {
-          this.deleteSelection();
-          this.renderAll();
+          this.deleteSelection_();
+          this.renderAll_();
         }
       }
       break;
@@ -529,128 +525,130 @@ Editor.prototype.handleKeyDown = function(e) {
 
   switch (e.which) {
   case 35:  // end
-    // Note, we use updateCursorFromRowAndX because we want to place the cursor
+    // Note, we use updateCursorFromRowAndX_ because we want to place the cursor
     // at EOL.
     if (e.shiftKey) {
-      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
-      this.updateCursorFromRowAndX(this.cursor.pos.row, this.innerWidth, true);
-      if (this.cursor.sel.p === this.cursor.pos.p) this.cursor.sel = null;
+      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
+      this.updateCursorFromRowAndX_(
+        this.cursor_.pos.row, this.innerWidth_, true);
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.cursor_.sel = null;
     } else {
-      this.updateCursorFromRowAndX(this.cursor.pos.row, this.innerWidth, true);
-      this.clearSelection();
+      this.updateCursorFromRowAndX_(
+        this.cursor_.pos.row, this.innerWidth_, true);
+      this.clearSelection_();
     }
-    this.renderSelectionAndCursor();
+    this.renderSelectionAndCursor_();
     break;
   case 36:  // home
     if (e.shiftKey) {
-      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
-      this.updateCursorFromP(this.linePOffsets[this.cursor.pos.row][0]);
-      if (this.cursor.sel.p === this.cursor.pos.p) this.cursor.sel = null;
+      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
+      this.updateCursorFromP_(this.linePOffsets_[this.cursor_.pos.row][0]);
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.cursor_.sel = null;
     } else {
-      this.updateCursorFromP(this.linePOffsets[this.cursor.pos.row][0]);
-      this.clearSelection();
+      this.updateCursorFromP_(this.linePOffsets_[this.cursor_.pos.row][0]);
+      this.clearSelection_();
     }
-    this.renderSelectionAndCursor();
+    this.renderSelectionAndCursor_();
     break;
   case 37:  // left arrow
     if (e.shiftKey) {
-      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
-      this.updateCursorFromP(
-        this.cursorHop(this.cursor.pos.p, false, e.ctrlKey));
-      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
+      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
+      this.updateCursorFromP_(
+        this.cursorHop_(this.cursor_.pos.p, false, e.ctrlKey));
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
     } else {
       if (sel !== null) {
         if (e.ctrlKey) {
-          this.updateCursorFromP(this.cursorHop(sel[0], false, true));
+          this.updateCursorFromP_(this.cursorHop_(sel[0], false, true));
         } else {
-          this.updateCursorFromP(sel[0]);
+          this.updateCursorFromP_(sel[0]);
         }
-        this.clearSelection();
+        this.clearSelection_();
       } else {
-        this.updateCursorFromP(
-          this.cursorHop(this.cursor.pos.p, false, e.ctrlKey));
+        this.updateCursorFromP_(
+          this.cursorHop_(this.cursor_.pos.p, false, e.ctrlKey));
       }
     }
-    this.renderSelectionAndCursor();
+    this.renderSelectionAndCursor_();
     break;
   case 38:  // up arrow
     var maybeMoveCursor = (function() {
-      if (this.cursor.pos.row > 0) {
-        if (this.cursor.pos.prevLeft === null) {
-          this.cursor.pos.prevLeft = this.cursor.pos.left;
+      if (this.cursor_.pos.row > 0) {
+        if (this.cursor_.pos.prevLeft === null) {
+          this.cursor_.pos.prevLeft = this.cursor_.pos.left;
         }
-        this.updateCursorFromRowAndX(
-          this.cursor.pos.row - 1, this.cursor.pos.prevLeft, false);
+        this.updateCursorFromRowAndX_(
+          this.cursor_.pos.row - 1, this.cursor_.pos.prevLeft, false);
       }
     }).bind(this);
     if (e.shiftKey) {
-      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
       maybeMoveCursor();
-      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
     } else {
       maybeMoveCursor();
-      this.clearSelection();
+      this.clearSelection_();
     }
-    this.renderSelectionAndCursor();
+    this.renderSelectionAndCursor_();
     break;
   case 39:  // right arrow
     if (e.shiftKey) {
-      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
-      this.updateCursorFromP(
-        this.cursorHop(this.cursor.pos.p, true, e.ctrlKey));
-      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
+      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
+      this.updateCursorFromP_(
+        this.cursorHop_(this.cursor_.pos.p, true, e.ctrlKey));
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
     } else {
       if (sel !== null) {
         if (e.ctrlKey) {
-          this.updateCursorFromP(this.cursorHop(sel[1], true, true));
+          this.updateCursorFromP_(this.cursorHop_(sel[1], true, true));
         } else {
-          this.updateCursorFromP(sel[1]);
+          this.updateCursorFromP_(sel[1]);
         }
-        this.clearSelection();
+        this.clearSelection_();
       } else {
-        this.updateCursorFromP(
-          this.cursorHop(this.cursor.pos.p, true, e.ctrlKey));
+        this.updateCursorFromP_(
+          this.cursorHop_(this.cursor_.pos.p, true, e.ctrlKey));
       }
     }
-    this.renderSelectionAndCursor();
+    this.renderSelectionAndCursor_();
     break;
   case 40:  // down arrow
     var maybeMoveCursor = (function() {
-      if (this.cursor.pos.row < this.linePOffsets.length - 1) {
-        if (this.cursor.pos.prevLeft === null) {
-          this.cursor.pos.prevLeft = this.cursor.pos.left;
+      if (this.cursor_.pos.row < this.linePOffsets_.length - 1) {
+        if (this.cursor_.pos.prevLeft === null) {
+          this.cursor_.pos.prevLeft = this.cursor_.pos.left;
         }
-        this.updateCursorFromRowAndX(
-          this.cursor.pos.row + 1, this.cursor.pos.prevLeft, false);
+        this.updateCursorFromRowAndX_(
+          this.cursor_.pos.row + 1, this.cursor_.pos.prevLeft, false);
       }
     }).bind(this);
     if (e.shiftKey) {
-      if (this.cursor.sel === null) this.cursor.sel = this.cursor.pos.copy();
+      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
       maybeMoveCursor();
-      if (this.cursor.sel.p === this.cursor.pos.p) this.clearSelection();
+      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
     } else {
       maybeMoveCursor();
-      this.clearSelection();
+      this.clearSelection_();
     }
-    this.renderSelectionAndCursor();
+    this.renderSelectionAndCursor_();
     break;
   case 8:  // backspace
     if (sel !== null) {
-      this.deleteSelection();
+      this.deleteSelection_();
     } else {
-      var beginP = this.cursorHop(this.cursor.pos.p, false, e.ctrlKey);
-      this.deleteText(beginP, this.cursor.pos.p - beginP);
+      var beginP = this.cursorHop_(this.cursor_.pos.p, false, e.ctrlKey);
+      this.deleteText_(beginP, this.cursor_.pos.p - beginP);
     }
-    this.renderAll();
+    this.renderAll_();
     break;
   case 46:  // delete
     if (sel !== null) {
-      this.deleteSelection();
+      this.deleteSelection_();
     } else {
-      var endP = this.cursorHop(this.cursor.pos.p, true, e.ctrlKey);
-      this.deleteText(this.cursor.pos.p, endP - this.cursor.pos.p);
+      var endP = this.cursorHop_(this.cursor_.pos.p, true, e.ctrlKey);
+      this.deleteText_(this.cursor_.pos.p, endP - this.cursor_.pos.p);
     }
-    this.renderAll();
+    this.renderAll_();
     break;
   default:
     return;
@@ -658,63 +656,63 @@ Editor.prototype.handleKeyDown = function(e) {
   e.preventDefault();
 };
 
-Editor.prototype.handleMouseDown = function(e) {
+ed.Editor.prototype.handleMouseDown_ = function(e) {
   var viewportX = e.pageX - window.pageXOffset;
   var viewportY = e.pageY - window.pageYOffset;
 
-  var rect = this.el.getBoundingClientRect();
+  var rect = this.el_.getBoundingClientRect();
   if (viewportX < rect.left || viewportX > rect.right ||
       viewportY < rect.top || viewportY > rect.bottom) {
-    this.cursor.hasFocus = false;
-    this.renderCursor();
+    this.cursor_.hasFocus = false;
+    this.renderCursor_();
     return;
   }
-  this.cursor.hasFocus = true;
-  this.mouseIsDown = true;
+  this.cursor_.hasFocus = true;
+  this.mouseIsDown_ = true;
   e.preventDefault();
 
-  var innerRect = this.innerEl.getBoundingClientRect();
+  var innerRect = this.innerEl_.getBoundingClientRect();
   var x = viewportX - innerRect.left;
   var y = viewportY - innerRect.top;
-  this.updateCursorFromRowAndX(this.rowFromY(y), x, true);
-  this.cursor.sel = this.cursor.pos.copy();
-  this.renderSelectionAndCursor();
+  this.updateCursorFromRowAndX_(this.rowFromY_(y), x, true);
+  this.cursor_.sel = this.cursor_.pos.copy();
+  this.renderSelectionAndCursor_();
 
-  document.addEventListener('mousemove', this.boundHandleMouseMove);
+  document.addEventListener('mousemove', this.boundHandleMouseMove_);
 };
 
-Editor.prototype.handleMouseUp = function(e) {
-  if (!this.cursor.hasFocus) return;
-  this.mouseIsDown = false;
-  console.assert(this.cursor.sel !== null);
+ed.Editor.prototype.handleMouseUp_ = function(e) {
+  if (!this.cursor_.hasFocus) return;
+  this.mouseIsDown_ = false;
+  console.assert(this.cursor_.sel !== null);
   e.preventDefault();
 
-  if (this.cursor.pos.p === this.cursor.sel.p) {
-    this.clearSelection();
-    this.renderCursor();
+  if (this.cursor_.pos.p === this.cursor_.sel.p) {
+    this.clearSelection_();
+    this.renderCursor_();
   }
 
-  document.removeEventListener('mousemove', this.boundHandleMouseMove);
+  document.removeEventListener('mousemove', this.boundHandleMouseMove_);
 };
 
-Editor.prototype.handleMouseMove = function(e) {
-  console.assert(this.cursor.hasFocus);
-  console.assert(this.mouseIsDown);
-  console.assert(this.cursor.sel !== null);
+ed.Editor.prototype.handleMouseMove_ = function(e) {
+  console.assert(this.cursor_.hasFocus);
+  console.assert(this.mouseIsDown_);
+  console.assert(this.cursor_.sel !== null);
   e.preventDefault();
 
   var viewportX = e.pageX - window.pageXOffset;
   var viewportY = e.pageY - window.pageYOffset;
 
-  var innerRect = this.innerEl.getBoundingClientRect();
+  var innerRect = this.innerEl_.getBoundingClientRect();
   var x = viewportX - innerRect.left;
   var y = viewportY - innerRect.top;
-  this.updateCursorFromRowAndX(this.rowFromY(y), x, true);
-  if (this.cursor.pos.p === this.cursor.sel.p) {
-    // Mouse is down, with 0 chars selected. Copy CursorPos from start of
+  this.updateCursorFromRowAndX_(this.rowFromY_(y), x, true);
+  if (this.cursor_.pos.p === this.cursor_.sel.p) {
+    // Mouse is down, with 0 chars selected. Copy CursorPos_ from start of
     // selection so that this location is used for rendering the cursor even if
     // it's EOL.
-    this.cursor.pos = this.cursor.sel.copy();
+    this.cursor_.pos = this.cursor_.sel.copy();
   }
-  this.renderSelectionAndCursor();
+  this.renderSelectionAndCursor_();
 };

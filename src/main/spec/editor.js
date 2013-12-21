@@ -4,6 +4,8 @@
 //  - http://sinonjs.org/
 //
 // TODO:
+//  - Rename to editor_test.js
+//  - Mouse tests
 //  - Add tests where we apply the same operations in textarea and editor, then
 //    compare state
 //  - Add tests for rendering, perhaps using Depicted
@@ -83,25 +85,25 @@ var fireKeyDownSeq = function(seq) {
 
 // Returns the current text content.
 var text = function() {
-  return ed.text;
+  return editor.text_;
 };
 
 // Returns the current cursor position.
 var curp = function() {
-  return ed.cursor.pos.p;
+  return editor.cursor_.pos.p;
 };
 
 // Returns the current cursor [p, row, left].
 var curState = function() {
-  var pos = ed.cursor.pos;
+  var pos = editor.cursor_.pos;
   return [pos.p, pos.row, pos.left];
 };
 
 // Returns the current selection start position, or null if there's no
 // selection.
 var selp = function() {
-  if (ed.cursor.sel === null) return null;
-  return ed.cursor.sel.p;
+  if (editor.cursor_.sel === null) return null;
+  return editor.cursor_.sel.p;
 };
 
 // Returns the current editor state: text, curp, selp, etc.
@@ -122,7 +124,7 @@ var repeat = function(s, n) {
 
 describe('Editor keyboard basics', function() {
   beforeEach(function() {
-    ed.reset();
+    editor.reset();
     expect(state()).toEqual(['', 0]);
   });
 
@@ -254,7 +256,7 @@ describe('Editor keyboard basics', function() {
 
     // Non-alphanumeric chars (including newlines and periods) should behave the
     // same way as spaces.
-    ed.reset();
+    editor.reset();
     t = 'aa+/.\r|3a';
     type(t);
     expect(state()).toEqual([t, 9]);
@@ -268,7 +270,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 9]);
 
     // Leading and trailing spaces.
-    ed.reset();
+    editor.reset();
     t = '  ';
     type(t);
     expect(state()).toEqual([t, 2]);
@@ -371,7 +373,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 3]);
 
     // Leading and trailing spaces.
-    ed.reset();
+    editor.reset();
     t = '  ';
     type(t);
     expect(state()).toEqual([t, 2]);
@@ -484,13 +486,13 @@ describe('Editor keyboard basics', function() {
 
 describe('Editor rendering', function() {
   beforeEach(function() {
-    ed.reset();
+    editor.reset();
     expect(state()).toEqual(['', 0]);
   });
 
   it('innerWidth', function() {
     // Tests below assume that one line can fit 37 W's.
-    expect(Math.floor(ed.innerWidth / W_WIDTH)).toEqual(37);
+    expect(Math.floor(editor.innerWidth_ / W_WIDTH)).toEqual(37);
   });
 
   it('home/end with wrapped line', function() {
@@ -518,7 +520,7 @@ describe('Editor rendering', function() {
     expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
 
     // This time, a wrapped line with a space.
-    ed.reset();
+    editor.reset();
     var w29_w20 = repeat('W', 29) + ' ' + repeat('W', 20);
     type(w29_w20);
     expect(state()).toEqual([w29_w20, 50]);
@@ -621,7 +623,7 @@ describe('Editor rendering', function() {
     expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
 
     // This time, a wrapped line with a space.
-    ed.reset();
+    editor.reset();
     var w10 = repeat('W', 10);
     var w29_w18_w = repeat('W', 29) + ' ' + repeat('W', 18) + ' ' + 'W';
     type(w29_w18_w + '\r\r' + w29_w18_w + '\r' + w10);
@@ -698,7 +700,7 @@ describe('Editor rendering', function() {
 // TODO: Test keyboard shortcuts on non-Mac (i.e. ctrlKey instead of metaKey).
 describe('Editor keyboard shortcuts', function() {
   beforeEach(function() {
-    ed.reset();
+    editor.reset();
     expect(state()).toEqual(['', 0]);
   });
 
@@ -715,30 +717,30 @@ describe('Editor keyboard shortcuts', function() {
     type(t);
 
     expect(state()).toEqual([t, 8]);
-    expect(ed.clipboard).toEqual('');
+    expect(editor.clipboard_).toEqual('');
     fireKeyDownSeq('meta+C meta+X meta+V');
     expect(state()).toEqual([t, 8]);
-    expect(ed.clipboard).toEqual('');
+    expect(editor.clipboard_).toEqual('');
 
     fireKeyDownSeq('shift+ctrl+left meta+X');
     expect(state()).toEqual(['aa bb ', 6]);
-    expect(ed.clipboard).toEqual('cc');
+    expect(editor.clipboard_).toEqual('cc');
     fireKeyDownSeq('meta+V');
     expect(state()).toEqual([t, 8]);
-    expect(ed.clipboard).toEqual('cc');
+    expect(editor.clipboard_).toEqual('cc');
 
     fireKeyDownSeq('ctrl+left left shift+ctrl+left meta+C delete');
     expect(state()).toEqual(['aa  cc', 3]);
-    expect(ed.clipboard).toEqual('bb');
+    expect(editor.clipboard_).toEqual('bb');
     fireKeyDownSeq('meta+V');
     expect(state()).toEqual([t, 5]);
-    expect(ed.clipboard).toEqual('bb');
+    expect(editor.clipboard_).toEqual('bb');
 
     fireKeyDownSeq('meta+A meta+C');
-    expect(ed.clipboard).toEqual(t);
+    expect(editor.clipboard_).toEqual(t);
     fireKeyDownSeq('meta+V meta+V');
     expect(state()).toEqual([t + t, 16]);
-    expect(ed.clipboard).toEqual(t);
+    expect(editor.clipboard_).toEqual(t);
   });
 
   it('multiple cut/copy commands', function() {
@@ -746,13 +748,13 @@ describe('Editor keyboard shortcuts', function() {
     type(t);
     fireKeyDownSeq('shift+left meta+C');
     expect(state()).toEqual([t, 3, 4]);
-    expect(ed.clipboard).toEqual('d');
+    expect(editor.clipboard_).toEqual('d');
     fireKeyDownSeq('left shift+home meta+C');
     expect(state()).toEqual([t, 0, 3]);
-    expect(ed.clipboard).toEqual('abc');
+    expect(editor.clipboard_).toEqual('abc');
     fireKeyDownSeq('shift+right meta+X');
     expect(state()).toEqual(['ad', 1]);
-    expect(ed.clipboard).toEqual('bc');
+    expect(editor.clipboard_).toEqual('bc');
   });
 
   it('change selection, then paste', function() {
@@ -766,32 +768,31 @@ describe('Editor keyboard shortcuts', function() {
 
 describe('Editor mouse', function() {
   beforeEach(function() {
-    ed.reset();
+    editor.reset();
     expect(state()).toEqual(['', 0]);
   });
 });
 
-describe('HtmlSizer', function() {
-  it('size of one char', function() {
+describe('HtmlSizer_', function() {
+  var hs;
+
+  beforeEach(function() {
     var parentEl = document.createElement('div');
     document.body.appendChild(parentEl);
-    var htmlSizer = new HtmlSizer(parentEl);
-    expect(htmlSizer.size('W')).toEqual([W_WIDTH, W_HEIGHT]);
+    hs = new ed.HtmlSizer_(parentEl);
+  });
+
+  it('size of one char', function() {
+    expect(hs.size('W')).toEqual([W_WIDTH, W_HEIGHT]);
   });
 
   it('size of two chars', function() {
-    var parentEl = document.createElement('div');
-    document.body.appendChild(parentEl);
-    var htmlSizer = new HtmlSizer(parentEl);
-    expect(htmlSizer.size('WW')).toEqual([2 * W_WIDTH, W_HEIGHT]);
+    expect(hs.size('WW')).toEqual([2 * W_WIDTH, W_HEIGHT]);
   });
 
   it('width calls size', function() {
-    var parentEl = document.createElement('div');
-    document.body.appendChild(parentEl);
-    var htmlSizer = new HtmlSizer(parentEl);
-    spyOn(htmlSizer, 'size').andCallThrough();
-    htmlSizer.width('hi');
-    expect(htmlSizer.size).toHaveBeenCalledWith('hi');
+    spyOn(hs, 'size').andCallThrough();
+    hs.width('hi');
+    expect(hs.size).toHaveBeenCalledWith('hi');
   });
 });
