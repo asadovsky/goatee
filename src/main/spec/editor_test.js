@@ -7,8 +7,9 @@
 //  - Mouse tests
 //  - Add tests where we apply the same operations in textarea and editor, then
 //    compare state
-//  - Add tests for rendering, perhaps using Depicted
-//    https://github.com/bslatkin/dpxdt
+//  - Add tests for rendering, perhaps using
+//     * Depicted (https://github.com/bslatkin/dpxdt)
+//     * Huxley (https://github.com/facebook/huxley)
 
 'use strict';
 

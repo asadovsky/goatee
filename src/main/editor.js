@@ -10,6 +10,7 @@
 //  - Support non-ASCII characters
 //  - Fancier cut/copy/paste, see http://goo.gl/Xv1YcG
 //  - Support screen scaling
+//  - Play with React (http://facebook.github.io/react/)
 
 'use strict';
 
