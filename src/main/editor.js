@@ -1,6 +1,7 @@
 // Defines Editor class as well as some private classes.
 //
 // TODO:
+//  - For cursor, maybe switch to selectionStart/selectionEnd model
 //  - Support OT insert/delete text ops and cursor/selection ops
 //  - For performance of insert and delete ops, represent text using something
 //    like https://github.com/josephg/jumprope

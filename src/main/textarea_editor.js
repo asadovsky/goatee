@@ -4,7 +4,6 @@
 //
 // TODO:
 //  - Catch undo/redo, maybe using 'input' event
-//  - Update cursor position in insertText and deleteText
 
 'use strict';
 
@@ -35,13 +34,27 @@ goatee.TextAreaEditor.prototype.setText = function(text) {
 };
 
 goatee.TextAreaEditor.prototype.insertText = function(pos, value) {
+  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   var t = this.el_.value;
   this.el_.value = t.substr(0, pos) + value + t.substr(pos);
+  // If this editor has focus, update its cursor position.
+  if (document.activeElement === this.el_) {
+    if (selStart >= pos) selStart += value.length;
+    if (selEnd >= pos) selEnd += value.length;
+    this.el_.setSelectionRange(selStart, selEnd);
+  }
 };
 
 goatee.TextAreaEditor.prototype.deleteText = function(pos, len) {
+  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   var t = this.el_.value;
   this.el_.value = t.substr(0, pos) + t.substr(pos + len);
+  // If this editor has focus, update its cursor position.
+  if (document.activeElement === this.el_) {
+    if (selStart > pos) selStart = Math.max(pos, selStart - len);
+    if (selEnd > pos) selEnd = Math.max(pos, selEnd - len);
+    this.el_.setSelectionRange(selStart, selEnd);
+  }
 };
 
 goatee.TextAreaEditor.prototype.addEventListener = function(type, handler) {
