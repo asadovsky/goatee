@@ -24,10 +24,10 @@ goatee.TextAreaEditor = function(editorEl) {
 
   // Set up listeners to handle user input events. Use keypress to catch char
   // insertions, keydown to catch backspace/delete. Also catch cut and paste.
-  document.addEventListener('keypress', this.handleKeyPress_.bind(this));
-  document.addEventListener('keydown', this.handleKeyDown_.bind(this));
-  document.addEventListener('cut', this.handleCut_.bind(this));
-  document.addEventListener('paste', this.handlePaste_.bind(this));
+  this.el_.addEventListener('keypress', this.handleKeyPress_.bind(this));
+  this.el_.addEventListener('keydown', this.handleKeyDown_.bind(this));
+  this.el_.addEventListener('cut', this.handleCut_.bind(this));
+  this.el_.addEventListener('paste', this.handlePaste_.bind(this));
 };
 
 goatee.TextAreaEditor.prototype.setText = function(text) {

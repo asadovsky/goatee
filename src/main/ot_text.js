@@ -6,6 +6,8 @@
 var goatee = goatee || {};
 goatee.ot = goatee.ot || {};
 
+goatee.ot.DEBUG_OT = false;
+
 goatee.ot.opFromString = function(s) {
   var colon = s.indexOf(':');
   if (colon === -1) {
@@ -74,7 +76,7 @@ goatee.ot.transformInsertDelete_ = function(a, b) {
 };
 
 goatee.ot.transform = function(a, b) {
-  console.log('transform(' + a + ', ' + b + ')');
+  if (goatee.ot.DEBUG_OT) console.log('transform(' + a + ', ' + b + ')');
   switch (a.typeName()) {
   case 'Insert':
     switch (b.typeName()) {

@@ -1,9 +1,9 @@
 'use strict';
 
-var editorEl = document.querySelector('#editor');
-var editor = new goatee.TextAreaEditor(editorEl);
+var editor1 = new goatee.TextAreaEditor(document.querySelector('#editor1'));
+var editor2 = new goatee.TextAreaEditor(document.querySelector('#editor2'));
 
-var onDocLoaded = function(doc) {
+var onDocLoaded = function(doc, editor) {
   var model = doc.getModel();
   editor.setText(model.getText());
 
@@ -14,4 +14,5 @@ var onDocLoaded = function(doc) {
   editor.addEventListener(goatee.EventType.TEXT_DELETE, model.deleteText);
 };
 
-goatee.ot.load(0, onDocLoaded);
+goatee.ot.load(0, function(doc) { onDocLoaded(doc, editor1); });
+goatee.ot.load(0, function(doc) { onDocLoaded(doc, editor2); });

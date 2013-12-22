@@ -8,10 +8,19 @@
   </head>
   <body data-ws-url="{{.}}">
     <h1>Goatee textarea</h1>
-    <div><textarea id="editor" rows="10" cols="50"></textarea></div>
     <div>
-      <button id="undo-button" class="display-none" disabled>Undo</button>
-      <button id="redo-button" class="display-none" disabled>Redo</button>
+      <textarea id="editor1" rows="10" cols="50"></textarea>
+      <div>
+        <button id="undo-button" class="display-none" disabled>Undo</button>
+        <button id="redo-button" class="display-none" disabled>Redo</button>
+      </div>
+    </div>
+    <div>
+      <textarea id="editor2" rows="10" cols="50"></textarea>
+      <div>
+        <button id="undo-button" class="display-none" disabled>Undo</button>
+        <button id="redo-button" class="display-none" disabled>Redo</button>
+      </div>
     </div>
     <script src="common.js"></script>
     <script src="ot_text.js"></script>

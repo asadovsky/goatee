@@ -205,6 +205,5 @@ goatee.ot.Model.prototype.apply_ = function(op) {
 goatee.ot.Model.prototype.applyCompound_ = function(ops) {
   for (var i = 0; i < ops.length; i++) {
     this.apply_(ops[i]);
-    console.log('text:' + this.text_);
   }
 };
