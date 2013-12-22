@@ -147,10 +147,15 @@ goatee.ot.Model = function(doc, text) {
 };
 
 goatee.ot.Model.prototype.insertText = function(pos, value) {
+  var t = this.text_;
+  this.text_ = t.substr(0, pos) + value + t.substr(pos);
   this.doc_.pushOp_(new goatee.ot.Insert(pos, value));
 };
 
 goatee.ot.Model.prototype.deleteText = function(pos, len) {
+  var t = this.text_;
+  console.assert(pos + len <= t.length, 'Delete past end');
+  this.text_ = t.substr(0, pos) + t.substr(pos + len);
   this.doc_.pushOp_(new goatee.ot.Delete(pos, len));
 };
 
@@ -200,5 +205,6 @@ goatee.ot.Model.prototype.apply_ = function(op) {
 goatee.ot.Model.prototype.applyCompound_ = function(ops) {
   for (var i = 0; i < ops.length; i++) {
     this.apply_(ops[i]);
+    console.log('text:' + this.text_);
   }
 };

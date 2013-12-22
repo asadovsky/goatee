@@ -3,7 +3,8 @@
 // Public methods setText, insertText, and deleteText update the view.
 //
 // TODO:
-//  - Catch undo/redo, maybe using 'input' event.
+//  - Catch undo/redo, maybe using 'input' event
+//  - Update cursor position in insertText and deleteText
 
 'use strict';
 
