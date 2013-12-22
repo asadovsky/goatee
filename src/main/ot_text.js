@@ -3,29 +3,32 @@
 
 'use strict';
 
-var opFromString = function(s) {
+var goatee = goatee || {};
+goatee.ot = goatee.ot || {};
+
+goatee.ot.opFromString = function(s) {
   var colon = s.indexOf(':');
   if (colon === -1) {
     console.assert(false, 'Failed to parse operation "' + s + '"');
   }
   var pos = parseInt(s.substr(1, colon));
   if (s[0] === 'i') {
-    return new Insert(pos, s.substr(colon + 1));
+    return new goatee.ot.Insert(pos, s.substr(colon + 1));
   } else if (s[0] === 'd') {
-    return new Delete(pos, parseInt(s.substr(colon + 1)));
+    return new goatee.ot.Delete(pos, parseInt(s.substr(colon + 1)));
   }
   console.assert(false, 'Unknown operation "' + s[0] + '"');
 };
 
-var opsFromStrings = function(strs) {
+goatee.ot.opsFromStrings = function(strs) {
   var ops = new Array(strs.length);
   for (var i = 0; i < strs.length; i++) {
-    ops[i] = opFromString(strs[i]);
+    ops[i] = goatee.ot.opFromString(strs[i]);
   }
   return ops;
 };
 
-var opsToStrings = function(ops) {
+goatee.ot.opsToStrings = function(ops) {
   var strs = new Array(ops.length);
   for (var i = 0; i < ops.length; i++) {
     strs[i] = ops[i].toString();
@@ -33,85 +36,86 @@ var opsToStrings = function(ops) {
   return strs;
 };
 
-var Insert = function(pos, value) {
+goatee.ot.Insert = function(pos, value) {
   this.pos = pos;
   this.value = value;
 };
 
-Insert.prototype.toString = function() {
+goatee.ot.Insert.prototype.toString = function() {
   return 'i' + this.pos + ':' + this.value;
 };
 
-Insert.prototype.typeName = function() {
+goatee.ot.Insert.prototype.typeName = function() {
   return 'Insert';
 };
 
-var Delete = function(pos, len) {
+goatee.ot.Delete = function(pos, len) {
   this.pos = pos;
   this.len = len;
 };
 
-Delete.prototype.toString = function() {
+goatee.ot.Delete.prototype.toString = function() {
   return 'd' + this.pos + ':' + this.len;
 };
 
-Delete.prototype.typeName = function() {
+goatee.ot.Delete.prototype.typeName = function() {
   return 'Delete';
 };
 
-var transformInsertDelete = function(a, b) {
+goatee.ot.transformInsertDelete_ = function(a, b) {
   if (a.pos <= b.pos) {
-    return [a, new Delete(b.pos + a.value.length, b.len)];
+    return [a, new goatee.ot.Delete(b.pos + a.value.length, b.len)];
   } else if (a.pos < b.pos + b.len) {
-    return [new Insert(b.pos, ''), new Delete(b.pos, b.len + a.value.length)];
+    return [new goatee.ot.Insert(b.pos, ''),
+            new goatee.ot.Delete(b.pos, b.len + a.value.length)];
   } else {
-    return [new Insert(a.pos - b.len, a.value), b];
+    return [new goatee.ot.Insert(a.pos - b.len, a.value), b];
   }
 };
 
-var transform = function(a, b) {
+goatee.ot.transform = function(a, b) {
   console.log('transform(' + a + ', ' + b + ')');
   switch (a.typeName()) {
   case 'Insert':
     switch (b.typeName()) {
     case 'Insert':
       if (b.pos <= a.pos) {
-        return [new Insert(a.pos + b.value.length, a.value), b];
+        return [new goatee.ot.Insert(a.pos + b.value.length, a.value), b];
       } else {
-        return [a, new Insert(b.pos + a.value.length, b.value)];
+        return [a, new goatee.ot.Insert(b.pos + a.value.length, b.value)];
       }
     case 'Delete':
-      return transformInsertDelete(a, b);
+      return goatee.ot.transformInsertDelete_(a, b);
     }
   case 'Delete':
     switch (b.typeName()) {
     case 'Insert':
-      var ins_del = transformInsertDelete(b, a);
+      var ins_del = goatee.ot.transformInsertDelete_(b, a);
       return [ins_del[1], ins_del[0]];
     case 'Delete':
       var aEnd = a.pos + a.len;
       var bEnd = b.pos + b.len;
       if (aEnd <= b.pos) {
-        return [a, new Delete(b.pos - a.len, b.len)];
+        return [a, new goatee.ot.Delete(b.pos - a.len, b.len)];
       } else if (bEnd <= a.pos) {
-        return [new Delete(a.pos - b.len, a.len), b];
+        return [new goatee.ot.Delete(a.pos - b.len, a.len), b];
       }
       var pos = Math.min(a.pos, b.pos);
       var overlap = Math.max(0, Math.min(aEnd, bEnd) - math.Max(a.pos, b.pos));
       console.assert(overlap > 0);
-      return [new Delete(pos, a.len - overlap),
-              new Delete(pos, b.len - overlap)];
+      return [new goatee.ot.Delete(pos, a.len - overlap),
+              new goatee.ot.Delete(pos, b.len - overlap)];
     }
   }
 };
 
-var transformCompound = function(a, b) {
+goatee.ot.transformCompound = function(a, b) {
   var aNew = a.slice(0);
   var bNew = new Array(b.length);
   for (var i = 0; i < b.length; i++) {
     var bOp = b[i];
     for (var j = 0; j < aNew.length; j++) {
-      var tup = transform(aNew[j], bOp);
+      var tup = goatee.ot.transform(aNew[j], bOp);
       aNew[j] = tup[0];
       bOp = tup[1];
     }
@@ -120,11 +124,11 @@ var transformCompound = function(a, b) {
   return [aNew, bNew];
 };
 
-var Text = function(s) {
+goatee.ot.Text = function(s) {
   this.value = s;
 };
 
-Text.prototype.apply = function(op) {
+goatee.ot.Text.prototype.apply = function(op) {
   var v = this.value;
   switch (op.typeName()) {
   case 'Insert':
@@ -139,7 +143,7 @@ Text.prototype.apply = function(op) {
   }
 };
 
-Text.prototype.applyCompound = function(ops) {
+goatee.ot.Text.prototype.applyCompound = function(ops) {
   for (var i = 0; i < ops.length; i++) {
     this.apply(ops[i]);
   }

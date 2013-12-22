@@ -779,7 +779,7 @@ describe('HtmlSizer_', function() {
   beforeEach(function() {
     var parentEl = document.createElement('div');
     document.body.appendChild(parentEl);
-    hs = new ed.HtmlSizer_(parentEl);
+    hs = new goatee.ed.HtmlSizer_(parentEl);
   });
 
   it('size of one char', function() {

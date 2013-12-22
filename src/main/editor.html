@@ -14,7 +14,11 @@
       <button id="undo-button" class="display-none" disabled>Undo</button>
       <button id="redo-button" class="display-none" disabled>Redo</button>
     </div>
+    <script src="common.js"></script>
     <script src="editor.js"></script>
-    <script>var editor = new ed.Editor(document.querySelector('#editor'));</script>
+    <script>
+      var editorEl = document.querySelector('#editor');
+      var editor = new goatee.ed.Editor(editorEl);
+    </script>
   </body>
 </html>
