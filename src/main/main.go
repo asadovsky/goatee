@@ -50,8 +50,8 @@ var port = flag.Int("port", 4000, "")
 var listenAddr string
 
 func init() {
-	//listenAddr = fmt.Sprintf("0.0.0.0:%d", *port)
 	listenAddr = fmt.Sprintf("localhost:%d", *port)
+	//listenAddr = fmt.Sprintf("0.0.0.0:%d", *port)
 }
 
 func marshalOrPanic(v interface{}) string {

@@ -39,7 +39,8 @@ goatee.ot.Document = function(onDocLoaded) {
   // starts at clientOps[ackedClientOpIdx] + 1.
   this.clientOps_ = [];
 
-  this.socket_ = new WebSocket(document.body.getAttribute('data-ws-url'));
+  var data_ws_url = document.body.getAttribute('data-ws-url');
+  this.socket_ = new WebSocket(data_ws_url);
   this.model_ = null;  // initialized in socket.onmessage
 
   this.socket_.onclose = (function(event) {
@@ -124,7 +125,8 @@ goatee.ot.Document.prototype.pushOp_ = function(op) {
   // If op is parented off server state space (as opposed to some non-acked
   // client op), send it right away.
   if (clientOpIdx === this.ackedClientOpIdx_ + 1) {
-    this.sendBufferedOps_();
+    // Use setTimeout(x, 0) to avoid blocking the client.
+    window.setTimeout(this.sendBufferedOps_.bind(this), 0);
   }
 };
 
