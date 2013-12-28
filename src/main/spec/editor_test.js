@@ -485,7 +485,7 @@ describe('Editor keyboard basics', function() {
   });
 });
 
-describe('Editor rendering', function() {
+describe('Editor render-based state', function() {
   beforeEach(function() {
     resetEditor();
     expect(state()).toEqual(['', 0]);
