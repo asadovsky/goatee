@@ -1,10 +1,12 @@
 // Defines Editor class as well as some private classes.
 //
+// Model (either local or OT) stores text and selection range.
+// Some state (e.g. charSizes_, linePOffsets_, some cursor state) lives in
+// Editor, not in model.
+//
 // TODO:
-//  - For cursor, maybe switch to selectionStart/selectionEnd model
-//  - Support OT insert/delete text ops and cursor/selection ops
-//  - For performance of insert and delete ops, represent text using something
-//    like https://github.com/josephg/jumprope
+//  - For faster text mutations, represent text using something like
+//    https://github.com/josephg/jumprope
 //  - Make select-scroll smooth
 //  - Support bold, italics
 //  - Support font-size and line-height
@@ -12,6 +14,16 @@
 //  - Fancier cut/copy/paste, see http://goo.gl/Xv1YcG
 //  - Support screen scaling
 //  - Play with React (http://facebook.github.io/react/)
+//
+// OT-specific TODO:
+//  - Show all cursors and selections
+//  - Smarter handling of cursor_.prevLeft on non-local text mutations
+//
+// Bugs:
+//  - Fill 1.5 rows of W char, then shift+end in first row, then hit down.
+//    Cursor should move down a row, but instead the selection doesn't change.
+//  - Fill 1.5 rows of W char, then select all. Extra space selected at the end
+//    of the first row.
 
 'use strict';
 
@@ -21,7 +33,7 @@ goatee.ed = goatee.ed || {};
 goatee.ed.DEBUG = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
-// Data structures
+// HtmlSizer_
 
 goatee.ed.HtmlSizer_ = function(parentEl) {
   this.el_ = document.createElement('div');
@@ -47,67 +59,117 @@ goatee.ed.HtmlSizer_.prototype.height = function(html) {
   return this.size(html)[1];
 };
 
-// Struct for cursor position data.
-goatee.ed.CursorPos_ = function(p, row, left) {
-  this.p = p;  // in [0, text.length]
+////////////////////////////////////////////////////////////////////////////////
+// Model_
 
-  // If true, cursor should be rendered to the right of the char at offset p-1,
+// FIXME: Set isLocal correctly.
+
+goatee.ed.Model_ = function() {
+  this.text_ = '';
+  this.selStart_ = 0;
+  this.selEnd_ = 0;
+
+  this.listeners_ = {};
+  this.listeners_[goatee.EventType.TEXT_INSERT] = [];
+  this.listeners_[goatee.EventType.TEXT_DELETE] = [];
+  this.listeners_[goatee.EventType.SET_SELECTION] = [];
+};
+
+goatee.ed.Model_.prototype.getText = function() {
+  return this.text_;
+};
+
+goatee.ed.Model_.prototype.getSelectionRange = function() {
+  return [this.selStart_, this.selEnd_];
+};
+
+goatee.ed.Model_.prototype.insertText = function(pos, value) {
+  this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos);
+  this.selStart_ = pos + value.length;
+  this.selEnd_ = this.selStart_;
+
+  var arr = this.listeners_[goatee.EventType.TEXT_INSERT];
+  for (var i = 0; i < arr.length; i++) {
+    arr[i](pos, value);
+  }
+};
+
+goatee.ed.Model_.prototype.deleteText = function(pos, len) {
+  this.text_ = this.text_.substr(0, pos) + this.text_.substr(pos + len);
+  this.selStart_ = pos;
+  this.selEnd_ = this.selStart_;
+
+  var arr = this.listeners_[goatee.EventType.TEXT_DELETE];
+  for (var i = 0; i < arr.length; i++) {
+    arr[i](pos, len);
+  }
+};
+
+goatee.ed.Model_.prototype.setSelectionRange = function(start, end) {
+  this.selStart_ = start;
+  this.selEnd_ = end;
+
+  var arr = this.listeners_[goatee.EventType.SET_SELECTION];
+  for (var i = 0; i < arr.length; i++) {
+    arr[i](start, end);
+  }
+};
+
+goatee.ed.Model_.prototype.addEventListener = function(type, handler) {
+  this.listeners_[type].push(handler);
+};
+
+goatee.ed.Model_.prototype.removeEventListener = function(type, handler) {
+  goatee.removeFromArray(handler, this.listeners_[type]);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Cursor_
+
+goatee.ed.Cursor_ = function() {
+  // If true, cursor should be rendered to the right of the char at offset p-1
   // rather than at the left edge of the char at offset p. This can happen when
   // user presses the "end" key or clicks past the end of a line.
   this.append = false;
 
-  // Used for tracking previous left position, needed to implement up and down
-  // arrow keys.
+  // Used for tracking previous left position in pixels, needed to implement
+  // up/down arrows.
   this.prevLeft = null;
 
-  // Used for rendering. Technically not part of state (i.e. can be derived from
-  // state), but kept up-to-date for performance and implementation simplicity
-  // reasons.
-  this.row = row;    // row (line number)
-  this.left = left;  // left position, in pixels
-};
+  // Used for rendering. Row is also needed to implement up/down arrows.
+  this.row = 0;   // row (line number)
+  this.left = 0;  // left position, in pixels
 
-goatee.ed.CursorPos_.prototype.copy = function() {
-  return new goatee.ed.CursorPos_(this.p, this.row, this.left);
-};
-
-goatee.ed.Cursor_ = function() {
-  this.pos = new goatee.ed.CursorPos_(0, 0, 0);
-  this.sel = null;  // start pos of selection, or null if no selection
-
-  this.hasFocus = true;  // whether the editor has focus
   this.blinkTimer_ = 0;
 
   this.el_ = document.createElement('div');
   this.el_.className = 'cursor';
 
   window.setInterval((function() {
-    if (!this.hasFocus || this.blinkTimer_ === -1) return;
+    if (this.blinkTimer_ === -1) return;
     this.blinkTimer_ = (this.blinkTimer_ + 1) % 10;
     // Visible 60% of the time, hidden 40% of the time.
     this.el_.style.visibility = (this.blinkTimer_ < 6) ? 'visible' : 'hidden';
   }).bind(this), 100);
 };
 
+goatee.ed.Cursor_.prototype.show = function(blink) {
+  this.blinkTimer_ = (blink ? 0 : -1);
+  this.el_.style.visibility = 'visible';
+};
+
+goatee.ed.Cursor_.prototype.hide = function() {
+  this.blinkTimer_ = -1;
+  this.el_.style.visibility = 'hidden';
+};
+
 // Here, bottom means "distance from top of editor to bottom of cursor".
-goatee.ed.Cursor_.prototype.render = function(left, bottom, height) {
-  if (goatee.ed.DEBUG) console.log(this.pos, this.sel, this.hasFocus);
+goatee.ed.Cursor_.prototype.move = function(left, bottom, height) {
   if (goatee.ed.DEBUG) console.log(left, bottom, height);
 
   this.el_.style.left = left + 'px';
   this.el_.style.top = bottom - height + 'px';
   this.el_.style.height = height + 'px';
-
-  if (!this.hasFocus) {
-    this.el_.style.visibility = 'hidden';
-  } else if (this.sel !== null) {
-    this.blinkTimer_ = -1;
-    this.el_.style.visibility = (
-      this.pos.p === this.sel.p ? 'visible' : 'hidden');
-  } else {
-    this.blinkTimer_ = 0;
-    this.el_.style.visibility = 'visible';
-  }
 
   // If the cursor is not in the window, scroll the window.
   var wTop = window.pageYOffset, wBottom = wTop + window.innerHeight;
@@ -120,11 +182,15 @@ goatee.ed.Cursor_.prototype.render = function(left, bottom, height) {
   }
 };
 
-goatee.ed.Editor = function(editorEl) {
-  this.el_ = editorEl;
-  this.reset();
+////////////////////////////////////////////////////////////////////////////////
+// Editor
 
-  // Set up listeners to handle user input events.
+goatee.ed.Editor = function(editorEl, model) {
+  this.el_ = editorEl;
+  this.reset(model);
+
+  // Register input handlers.
+  // TODO: Provide some way to remove these document event handlers.
   this.boundHandleMouseMove_ = this.handleMouseMove_.bind(this);
   document.addEventListener('keypress', this.handleKeyPress_.bind(this));
   document.addEventListener('keydown', this.handleKeyDown_.bind(this));
@@ -132,13 +198,26 @@ goatee.ed.Editor = function(editorEl) {
   document.addEventListener('mouseup', this.handleMouseUp_.bind(this));
 };
 
-goatee.ed.Editor.prototype.reset = function() {
-  this.clipboard_ = '';
-  this.cursor_ = new goatee.ed.Cursor_();
+goatee.ed.Editor.prototype.reset = function(model) {
+  this.m_ = model || new goatee.ed.Model_();
+
+  // Register model event handlers.
+  this.m_.addEventListener(
+    goatee.EventType.TEXT_INSERT, this.handleInsertText_.bind(this));
+  this.m_.addEventListener(
+    goatee.EventType.TEXT_DELETE, this.handleDeleteText_.bind(this));
+  this.m_.addEventListener(
+    goatee.EventType.SET_SELECTION, this.handleSetSelectionRange_.bind(this));
+
+  // Reset internal state.
+  // FIXME: Handle non-empty model state.
+  this.hasFocus_ = true;
   this.mouseIsDown_ = false;
 
+  this.clipboard_ = '';
+  this.cursor_ = new goatee.ed.Cursor_();
+
   // Updated by insertText_ and deleteText_.
-  this.text_ = '';
   this.charSizes_ = [];       // array of [width, height]
   // Updated by renderAll_.
   this.linePOffsets_ = null;  // array of [beginP, endP]
@@ -163,6 +242,44 @@ goatee.ed.Editor.prototype.reset = function() {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Public methods
+
+goatee.ed.Editor.prototype.getText = function() {
+  return this.m_.getText();
+};
+
+goatee.ed.Editor.prototype.getSelectionRange = function() {
+  return this.m_.getSelectionRange();
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Model event handlers
+
+goatee.ed.Editor.prototype.handleInsertText_ = function(
+  pos, value, isLocal) {
+  var valueCharSizes = new Array(value.length);
+  for (var i = 0; i < value.length; i++) {
+    var c = value.charAt(i);
+    valueCharSizes[i] = this.hs_.size(this.makeLineHtml_(c, pos + i));
+  }
+  this.charSizes_ = this.charSizes_.slice(0, pos).concat(
+    valueCharSizes, this.charSizes_.slice(pos));
+
+  this.renderAll_();
+};
+
+goatee.ed.Editor.prototype.handleDeleteText_ = function(
+  pos, len, isLocal) {
+  this.charSizes_.splice(pos, len);
+  this.renderAll_();
+};
+
+goatee.ed.Editor.prototype.handleSetSelectionRange_ = function(
+  start, end, isLocal) {
+  this.renderSelection_();
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Utility methods
 
 goatee.ed.Editor.prototype.rowFromY_ = function(y) {
@@ -177,18 +294,18 @@ goatee.ed.Editor.prototype.rowFromY_ = function(y) {
 goatee.ed.Editor.ALPHANUM_RE_ = /[A-Za-z0-9]/;
 
 goatee.ed.Editor.prototype.cursorHop_ = function(p, forward, hop) {
-  var anre = goatee.ed.Editor.ALPHANUM_RE_;
+  var text = this.m_.getText(), anre = goatee.ed.Editor.ALPHANUM_RE_;
   if (forward) {
     if (hop) {
-      while (p < this.text_.length && !anre.test(this.text_.charAt(p))) p++;
-      while (p < this.text_.length && anre.test(this.text_.charAt(p))) p++;
-    } else if (p < this.text_.length) {
+      while (p < text.length && !anre.test(text.charAt(p))) p++;
+      while (p < text.length && anre.test(text.charAt(p))) p++;
+    } else if (p < text.length) {
       p++;
     }
   } else {  // backward
     if (hop) {
-      while (p > 0 && !anre.test(this.text_.charAt(p - 1))) p--;
-      while (p > 0 && anre.test(this.text_.charAt(p - 1))) p--;
+      while (p > 0 && !anre.test(text.charAt(p - 1))) p--;
+      while (p > 0 && anre.test(text.charAt(p - 1))) p--;
     } else if (p > 0) {
       p--;
     }
@@ -196,66 +313,68 @@ goatee.ed.Editor.prototype.cursorHop_ = function(p, forward, hop) {
   return p;
 };
 
+goatee.ed.Editor.prototype.getSelectionOrNull_ = function() {
+  var tup = this.m_.getSelectionRange(), selStart = tup[0], selEnd = tup[1];
+  if (selStart === selEnd) {
+    return null;
+  } else if (selStart < selEnd) {
+    return [selStart, selEnd];
+  } else {
+    return [selEnd, selStart];
+  }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
-// Model update methods
+// Selection state update methods
 
-// Some of these (e.g. insertText_) also update data needed only for rendering,
-// for efficiency purposes.
+// Updates state given p (offset), then renders selection.
+goatee.ed.Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
+  // TODO: If nothing has changed, don't update model or render.
+  this.cursor_.prevLeft = null;
+  if (!updateSelStart) {
+    this.m_.setSelectionRange(this.m_.getSelectionRange()[0], p);
+  } else {
+    this.cursor_.append = false;
+    this.m_.setSelectionRange(p, p);
+  }
+};
 
-// Updates cursor state given row and x position (in pixels).
-// Assumes text, charSizes, linePOffsets, etc. are up-to-date.
-goatee.ed.Editor.prototype.updateCursorFromRowAndX_ = function(
-  row, x, clearPrevLeft) {
+// Updates state given row and x position (in pixels), then renders selection.
+// Assumes linePOffsets_, lineYOffsets_, and charSizes_ are up-to-date.
+goatee.ed.Editor.prototype.setSelectionFromRowAndX_ = function(
+  row, x, updateSelStart, clearPrevLeft) {
   // Find char whose left is closest to x.
   var beginEnd = this.linePOffsets_[row];
   var pEnd = beginEnd[1];
-  if (pEnd > 0 && this.text_.charAt(pEnd - 1) === '\r') pEnd--;
+  if (pEnd > 0 && this.m_.getText().charAt(pEnd - 1) === '\r') pEnd--;
 
   var p = beginEnd[0], left = 0;
   for (; p < pEnd; p++) {
     var newLeft = left + this.charSizes_[p][0];
     if (newLeft >= x) {
       // Pick between left and newLeft.
-      if (newLeft - x < x - left) {
-        left = newLeft;
-        p++;
-      }
+      if (newLeft - x < x - left) p++;
       break;
     }
     left = newLeft;
   }
 
-  this.cursor_.pos.p = p;
-  // If the character at position p is actually on the next line, switch cursor
-  // state to "append" mode.
-  this.cursor_.pos.append = (p === beginEnd[1]);
-  if (clearPrevLeft) this.cursor_.pos.prevLeft = null;
-
-  this.cursor_.pos.row = row;
-  this.cursor_.pos.left = left;
+  // TODO: If nothing has changed, don't update model or render.
+  if (clearPrevLeft) this.cursor_.prevLeft = null;
+  if (!updateSelStart) {
+    this.m_.setSelectionRange(this.m_.getSelectionRange()[0], p);
+  } else {
+    // If the character at position p is actually on the next line, switch
+    // cursor state to "append" mode.
+    // FIXME: This should probably be done even if !updateSelStart. See bug
+    // description up top.
+    this.cursor_.append = (p === beginEnd[1] && p > beginEnd[0]);
+    this.m_.setSelectionRange(p, p);
+  }
 };
 
-// Updates cursor state given p (offset).
-// Assumes text, charSizes, linePOffsets, etc. are up-to-date.
-goatee.ed.Editor.prototype.updateCursorFromP_ = function(p) {
-  var numRows = this.linePOffsets_.length;
-  var row = 0;
-  // TODO: Use binary search.
-  for (; row < numRows - 1; row++) {
-    if (p < this.linePOffsets_[row][1]) break;
-  }
-  var left = 0;
-  for (var q = this.linePOffsets_[row][0]; q < p; q++) {
-    left += this.charSizes_[q][0];
-  }
-
-  this.cursor_.pos.p = p;
-  this.cursor_.pos.append = false;
-  this.cursor_.pos.prevLeft = null;
-
-  this.cursor_.pos.row = row;
-  this.cursor_.pos.left = left;
-};
+////////////////////////////////////////////////////////////////////////////////
+// Text state update methods
 
 goatee.ed.Editor.ESCAPE_CHAR_MAP_ = {
   ' ': '&nbsp;',
@@ -270,8 +389,9 @@ goatee.ed.Editor.escapeChar_ = function(c) {
   return x ? x : c;
 };
 
-// Generates html for the given line of text, assuming the text starts at
-// position p.
+// Generates html for the given text, assuming the text starts at position p.
+// Note, currently we don't use p, but eventually we'll need it to determine
+// styling (e.g. bold).
 goatee.ed.Editor.prototype.makeLineHtml_ = function(text, p) {
   var res = '';
   var len = text.length;
@@ -288,73 +408,70 @@ goatee.ed.Editor.prototype.makeLineHtml_ = function(text, p) {
   return '<div class="line"><div class="line-inner">' + res + '</div></div>';
 };
 
-// Updates text, charSizes, and cursor offset. Other cursor state (row and left)
-// must be updated by renderAll_, since that's where we update linePOffsets and
-// lineYOffsets.
 goatee.ed.Editor.prototype.insertText_ = function(p, value) {
-  this.text_ = this.text_.substr(0, p) + value + this.text_.substr(p);
-  var valueCharSizes = new Array(value.length);
-  for (var i = 0; i < value.length; i++) {
-    var c = value.charAt(i);
-    valueCharSizes[i] = this.hs_.size(this.makeLineHtml_(c, p + i));
-  }
-  this.charSizes_ = this.charSizes_.slice(0, p).concat(
-    valueCharSizes, this.charSizes_.slice(p));
-  this.cursor_.pos.p += value.length;
+  this.cursor_.append = false;
+  this.cursor_.prevLeft = null;
+  this.m_.insertText(p, value);
 };
 
-// See comment for insertText_.
 goatee.ed.Editor.prototype.deleteText_ = function(p, len) {
-  this.text_ = this.text_.substr(0, p) + this.text_.substr(p + len);
-  this.charSizes_.splice(p, len);
-  this.cursor_.pos.p = p;
+  this.cursor_.append = false;
+  this.cursor_.prevLeft = null;
+  this.m_.deleteText(p, len);
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// Selection-specific model update methods
-
-goatee.ed.Editor.prototype.getSelection_ = function() {
-  if (this.cursor_.sel === null || this.cursor_.pos.p === this.cursor_.sel.p) {
-    return null;
-  } else if (this.cursor_.pos.p < this.cursor_.sel.p) {
-    return [this.cursor_.pos.p, this.cursor_.sel.p];
-  } else {
-    return [this.cursor_.sel.p, this.cursor_.pos.p];
-  }
-};
-
-goatee.ed.Editor.prototype.clearSelection_ = function() {
-  this.cursor_.sel = null;
-};
-
-// See comment for insertText_.
 goatee.ed.Editor.prototype.deleteSelection_ = function() {
-  var sel = this.getSelection_();
+  var sel = this.getSelectionOrNull_();
   console.assert(sel !== null);
   this.deleteText_(sel[0], sel[1] - sel[0]);
-  this.cursor_.sel = null;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pure rendering methods
 
-goatee.ed.Editor.prototype.renderCursor_ = function() {
-  var beginEnd = this.lineYOffsets_[this.cursor_.pos.row];
-  this.cursor_.render(
-    this.cursor_.pos.left, beginEnd[1], beginEnd[1] - beginEnd[0]);
+goatee.ed.Editor.prototype.computeCursorRowAndLeft_ = function() {
+  var numRows = this.linePOffsets_.length;
+  var selEnd = this.m_.getSelectionRange()[1];
+  var row = 0;
+  // TODO: Use binary search.
+  for (; row < numRows - 1; row++) {
+    var p = this.linePOffsets_[row][1];
+    if (selEnd < p || (selEnd === p && this.cursor_.append)) break;
+  }
+  var left = 0;
+  for (var p = this.linePOffsets_[row][0]; p < selEnd; p++) {
+    left += this.charSizes_[p][0];
+  }
+  return [row, left];
 };
 
-goatee.ed.Editor.prototype.renderSelectionAndCursor_ = function() {
+goatee.ed.Editor.prototype.renderSelection_ = function() {
   var els = this.textEl_.querySelectorAll('.highlight');
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
     el.parentNode.removeChild(el);
   }
 
-  var sel = this.getSelection_();
-  if (sel !== null) {
+  var tup = this.computeCursorRowAndLeft_(), row = tup[0], left = tup[1];
+  this.cursor_.row = row;
+  this.cursor_.left = left;
+
+  var tup = this.lineYOffsets_[row], top = tup[0], bottom = tup[1];
+  this.cursor_.move(left, bottom, bottom - top);
+
+  var sel = this.getSelectionOrNull_();
+  if (sel === null) {
+    if (this.hasFocus_) {
+      this.cursor_.show(!this.mouseIsDown_);
+    } else {
+      this.cursor_.hide();
+    }
+  } else {
+    // TODO: If !this.hasFocus_, make the selection gray.
+    var text = this.m_.getText();
     var numRows = this.linePOffsets_.length;
     console.assert(numRows === this.textEl_.children.length);
+
     for (var row = 0; row < numRows; row++) {
       var beginEnd = this.linePOffsets_[row];
       if (sel[0] >= beginEnd[1]) continue;
@@ -370,8 +487,7 @@ goatee.ed.Editor.prototype.renderSelectionAndCursor_ = function() {
 
       // Compute right (or width).
       if (sel[1] > beginEnd[1] ||
-          (sel[1] === beginEnd[1] &&
-           this.text_.charAt(beginEnd[1] - 1) === '\r')) {
+          (sel[1] === beginEnd[1] && text.charAt(beginEnd[1] - 1) === '\r')) {
         el.style.right = '0';
       } else {
         var width = 0;
@@ -381,18 +497,19 @@ goatee.ed.Editor.prototype.renderSelectionAndCursor_ = function() {
 
       this.textEl_.children[row].appendChild(el);
     }
-  }
 
-  this.renderCursor_();
+    this.cursor_.hide();
+  }
 };
 
-// Renders text, selection, and cursor.
+// Renders text and selection/cursor.
 // Algorithm:
 //  - Build html and array of line p-offsets, based on char widths
 //  - Build array of line y-offsets
-//  - Process arrays to place cursor
+//  - Process arrays to place selection/cursor
 goatee.ed.Editor.prototype.renderAll_ = function() {
-  console.assert(this.charSizes_.length === this.text_.length);
+  var text = this.m_.getText();
+  console.assert(this.charSizes_.length === text.length);
 
   // Global state.
   this.linePOffsets_ = [];
@@ -408,8 +525,8 @@ goatee.ed.Editor.prototype.renderAll_ = function() {
   // Apply word-wrap: add chars one by one until too wide, figure out where to
   // add a newline, add it, then rinse and repeat.
   var p = 0;
-  while (p < this.text_.length) {
-    var c = this.text_.charAt(p);
+  while (p < text.length) {
+    var c = text.charAt(p);
     lineText += c;
     if (c === '\r') {
       p++;
@@ -441,7 +558,7 @@ goatee.ed.Editor.prototype.renderAll_ = function() {
     lineLastSpace = -1;
   }
   // Add last line.
-  console.assert(p === this.text_.length);
+  console.assert(p === text.length);
   this.linePOffsets_[row] = [lineBegin, p];
   html += this.makeLineHtml_(lineText, lineBegin);
 
@@ -462,10 +579,8 @@ goatee.ed.Editor.prototype.renderAll_ = function() {
     beginPx += lineHeight;
   }
 
-  // Now that we've updated linePOffsets and lineYOffsets, we can update cursor
-  // row and left.
-  this.updateCursorFromP_(this.cursor_.pos.p);
-  this.renderSelectionAndCursor_();
+  // Assumes linePOffsets_, lineYOffsets_, and charSizes_ are up-to-date.
+  this.renderSelection_();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -481,44 +596,39 @@ goatee.ed.Editor.IGNORE_KEYPRESS_ = {
 };
 
 goatee.ed.Editor.prototype.handleKeyPress_ = function(e) {
-  if (!this.cursor_.hasFocus || this.mouseIsDown_) return;
+  if (!this.hasFocus_ || this.mouseIsDown_) return;
 
   if (goatee.ed.Editor.IGNORE_KEYPRESS_[e.which]) return;
   if (e.which > 127) return;  // require ASCII for now
   e.preventDefault();
-  if (this.cursor_.sel !== null) this.deleteSelection_();
-  this.insertText_(this.cursor_.pos.p, String.fromCharCode(e.which));
-  this.renderAll_();
+  if (this.getSelectionOrNull_() !== null) this.deleteSelection_();
+
+  var p = this.m_.getSelectionRange()[1];
+  this.insertText_(p, String.fromCharCode(e.which));
 };
 
 goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
-  if (!this.cursor_.hasFocus || this.mouseIsDown_) return;
+  if (!this.hasFocus_ || this.mouseIsDown_) return;
 
-  var sel = this.getSelection_();
+  var sel = this.getSelectionOrNull_();
   // TODO: For Linux and Windows, require ctrlKey instead of metaKey.
   if (e.metaKey) {
     var c = String.fromCharCode(e.which);
     switch (c) {
     case 'V':
       if (sel !== null) this.deleteSelection_();
-      this.insertText_(this.cursor_.pos.p, this.clipboard_);
-      this.renderAll_();
+      var p = this.m_.getSelectionRange()[1];
+      this.insertText_(p, this.clipboard_);
       break;
     case 'A':
-      this.cursor_.sel = new goatee.ed.CursorPos_(
-        this.text_.length, null, null);
-      this.updateCursorFromP_(0);
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.cursor_.sel = null;
-      this.renderSelectionAndCursor_();
+      this.setSelectionFromP_(0, true);
+      this.setSelectionFromP_(this.m_.getText().length, false);
       break;
     case 'X':
     case 'C':
       if (sel !== null) {
-        this.clipboard_ = this.text_.substr(sel[0], sel[1] - sel[0]);
-        if (c === 'X') {
-          this.deleteSelection_();
-          this.renderAll_();
-        }
+        this.clipboard_ = this.m_.getText().substr(sel[0], sel[1] - sel[0]);
+        if (c === 'X') this.deleteSelection_();
       }
       break;
     default:
@@ -530,130 +640,77 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
 
   switch (e.which) {
   case 35:  // end
-    // Note, we use updateCursorFromRowAndX_ because we want to place the cursor
-    // at EOL.
-    if (e.shiftKey) {
-      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
-      this.updateCursorFromRowAndX_(
-        this.cursor_.pos.row, this.innerWidth_, true);
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.cursor_.sel = null;
-    } else {
-      this.updateCursorFromRowAndX_(
-        this.cursor_.pos.row, this.innerWidth_, true);
-      this.clearSelection_();
-    }
-    this.renderSelectionAndCursor_();
+    // Note, we use setSelectionFromRowAndX_ because we want to place the
+    // cursor at EOL.
+    this.setSelectionFromRowAndX_(
+      this.cursor_.row, this.innerWidth_, !e.shiftKey, true);
     break;
   case 36:  // home
-    if (e.shiftKey) {
-      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
-      this.updateCursorFromP_(this.linePOffsets_[this.cursor_.pos.row][0]);
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.cursor_.sel = null;
-    } else {
-      this.updateCursorFromP_(this.linePOffsets_[this.cursor_.pos.row][0]);
-      this.clearSelection_();
-    }
-    this.renderSelectionAndCursor_();
+    this.setSelectionFromP_(
+      this.linePOffsets_[this.cursor_.row][0], !e.shiftKey);
     break;
   case 37:  // left arrow
     if (e.shiftKey) {
-      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
-      this.updateCursorFromP_(
-        this.cursorHop_(this.cursor_.pos.p, false, e.ctrlKey));
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
+      var selEnd = this.m_.getSelectionRange()[1];
+      this.setSelectionFromP_(this.cursorHop_(selEnd, false, e.ctrlKey), false);
+    } else if (sel === null) {
+      var p = this.m_.getSelectionRange()[1];
+      this.setSelectionFromP_(this.cursorHop_(p, false, e.ctrlKey), true);
+    } else if (e.ctrlKey) {
+      this.setSelectionFromP_(this.cursorHop_(sel[0], false, true), true);
     } else {
-      if (sel !== null) {
-        if (e.ctrlKey) {
-          this.updateCursorFromP_(this.cursorHop_(sel[0], false, true));
-        } else {
-          this.updateCursorFromP_(sel[0]);
-        }
-        this.clearSelection_();
-      } else {
-        this.updateCursorFromP_(
-          this.cursorHop_(this.cursor_.pos.p, false, e.ctrlKey));
-      }
+      this.setSelectionFromP_(sel[0], true);
     }
-    this.renderSelectionAndCursor_();
     break;
   case 38:  // up arrow
-    var maybeMoveCursor = (function() {
-      if (this.cursor_.pos.row > 0) {
-        if (this.cursor_.pos.prevLeft === null) {
-          this.cursor_.pos.prevLeft = this.cursor_.pos.left;
-        }
-        this.updateCursorFromRowAndX_(
-          this.cursor_.pos.row - 1, this.cursor_.pos.prevLeft, false);
+    if (this.cursor_.row > 0) {
+      if (this.cursor_.prevLeft === null) {
+        this.cursor_.prevLeft = this.cursor_.left;
       }
-    }).bind(this);
-    if (e.shiftKey) {
-      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
-      maybeMoveCursor();
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
-    } else {
-      maybeMoveCursor();
-      this.clearSelection_();
+      this.setSelectionFromRowAndX_(
+        this.cursor_.row - 1, this.cursor_.prevLeft, !e.shiftKey, false);
+      this.renderSelection_();
     }
-    this.renderSelectionAndCursor_();
     break;
   case 39:  // right arrow
     if (e.shiftKey) {
-      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
-      this.updateCursorFromP_(
-        this.cursorHop_(this.cursor_.pos.p, true, e.ctrlKey));
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
+      var selEnd = this.m_.getSelectionRange()[1];
+      this.setSelectionFromP_(this.cursorHop_(selEnd, true, e.ctrlKey), false);
+    } else if (sel === null) {
+      var p = this.m_.getSelectionRange()[1];
+      this.setSelectionFromP_(this.cursorHop_(p, true, e.ctrlKey), true);
+    } else if (e.ctrlKey) {
+      this.setSelectionFromP_(this.cursorHop_(sel[1], true, true), true);
     } else {
-      if (sel !== null) {
-        if (e.ctrlKey) {
-          this.updateCursorFromP_(this.cursorHop_(sel[1], true, true));
-        } else {
-          this.updateCursorFromP_(sel[1]);
-        }
-        this.clearSelection_();
-      } else {
-        this.updateCursorFromP_(
-          this.cursorHop_(this.cursor_.pos.p, true, e.ctrlKey));
-      }
+      this.setSelectionFromP_(sel[1], true);
     }
-    this.renderSelectionAndCursor_();
     break;
   case 40:  // down arrow
-    var maybeMoveCursor = (function() {
-      if (this.cursor_.pos.row < this.linePOffsets_.length - 1) {
-        if (this.cursor_.pos.prevLeft === null) {
-          this.cursor_.pos.prevLeft = this.cursor_.pos.left;
-        }
-        this.updateCursorFromRowAndX_(
-          this.cursor_.pos.row + 1, this.cursor_.pos.prevLeft, false);
+    if (this.cursor_.row < this.linePOffsets_.length - 1) {
+      if (this.cursor_.prevLeft === null) {
+        this.cursor_.prevLeft = this.cursor_.left;
       }
-    }).bind(this);
-    if (e.shiftKey) {
-      if (this.cursor_.sel === null) this.cursor_.sel = this.cursor_.pos.copy();
-      maybeMoveCursor();
-      if (this.cursor_.sel.p === this.cursor_.pos.p) this.clearSelection_();
-    } else {
-      maybeMoveCursor();
-      this.clearSelection_();
+      this.setSelectionFromRowAndX_(
+        this.cursor_.row + 1, this.cursor_.prevLeft, !e.shiftKey, false);
     }
-    this.renderSelectionAndCursor_();
     break;
   case 8:  // backspace
     if (sel !== null) {
       this.deleteSelection_();
     } else {
-      var beginP = this.cursorHop_(this.cursor_.pos.p, false, e.ctrlKey);
-      this.deleteText_(beginP, this.cursor_.pos.p - beginP);
+      var p = this.m_.getSelectionRange()[1];
+      var beginP = this.cursorHop_(p, false, e.ctrlKey);
+      this.deleteText_(beginP, p - beginP);
     }
-    this.renderAll_();
     break;
   case 46:  // delete
     if (sel !== null) {
       this.deleteSelection_();
     } else {
-      var endP = this.cursorHop_(this.cursor_.pos.p, true, e.ctrlKey);
-      this.deleteText_(this.cursor_.pos.p, endP - this.cursor_.pos.p);
+      var p = this.m_.getSelectionRange()[1];
+      var endP = this.cursorHop_(p, true, e.ctrlKey);
+      this.deleteText_(p, endP - p);
     }
-    this.renderAll_();
     break;
   default:
     return;
@@ -668,42 +725,34 @@ goatee.ed.Editor.prototype.handleMouseDown_ = function(e) {
   var rect = this.el_.getBoundingClientRect();
   if (viewportX < rect.left || viewportX > rect.right ||
       viewportY < rect.top || viewportY > rect.bottom) {
-    this.cursor_.hasFocus = false;
-    this.renderCursor_();
+    this.hasFocus_ = false;
+    this.renderSelection_();
     return;
   }
-  this.cursor_.hasFocus = true;
+  this.hasFocus_ = true;
   this.mouseIsDown_ = true;
   e.preventDefault();
 
   var innerRect = this.innerEl_.getBoundingClientRect();
   var x = viewportX - innerRect.left;
   var y = viewportY - innerRect.top;
-  this.updateCursorFromRowAndX_(this.rowFromY_(y), x, true);
-  this.cursor_.sel = this.cursor_.pos.copy();
-  this.renderSelectionAndCursor_();
+  this.setSelectionFromRowAndX_(this.rowFromY_(y), x, true, true);
 
   document.addEventListener('mousemove', this.boundHandleMouseMove_);
 };
 
 goatee.ed.Editor.prototype.handleMouseUp_ = function(e) {
-  if (!this.cursor_.hasFocus) return;
+  if (!this.hasFocus_) return;
   this.mouseIsDown_ = false;
-  console.assert(this.cursor_.sel !== null);
   e.preventDefault();
-
-  if (this.cursor_.pos.p === this.cursor_.sel.p) {
-    this.clearSelection_();
-    this.renderCursor_();
-  }
+  this.renderSelection_();
 
   document.removeEventListener('mousemove', this.boundHandleMouseMove_);
 };
 
 goatee.ed.Editor.prototype.handleMouseMove_ = function(e) {
-  console.assert(this.cursor_.hasFocus);
+  console.assert(this.hasFocus_);
   console.assert(this.mouseIsDown_);
-  console.assert(this.cursor_.sel !== null);
   e.preventDefault();
 
   var viewportX = e.pageX - window.pageXOffset;
@@ -712,12 +761,5 @@ goatee.ed.Editor.prototype.handleMouseMove_ = function(e) {
   var innerRect = this.innerEl_.getBoundingClientRect();
   var x = viewportX - innerRect.left;
   var y = viewportY - innerRect.top;
-  this.updateCursorFromRowAndX_(this.rowFromY_(y), x, true);
-  if (this.cursor_.pos.p === this.cursor_.sel.p) {
-    // Mouse is down, with 0 chars selected. Copy CursorPos_ from start of
-    // selection so that this location is used for rendering the cursor even if
-    // it's EOL.
-    this.cursor_.pos = this.cursor_.sel.copy();
-  }
-  this.renderSelectionAndCursor_();
+  this.setSelectionFromRowAndX_(this.rowFromY_(y), x, false, true);
 };

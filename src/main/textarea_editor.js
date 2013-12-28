@@ -1,39 +1,56 @@
 // Defines TextAreaEditor class.
 //
-// Public methods setText, insertText, and deleteText update the view.
-//
 // TODO:
 //  - Catch undo/redo, maybe using 'input' event
 
 'use strict';
 
 var goatee = goatee || {};
+goatee.ta = goatee.ta || {};
 
-goatee.TextAreaEditor = function(editorEl) {
+////////////////////////////////////////////////////////////////////////////////
+// Model_
+
+goatee.ta.Model_ = function() {
+  this.insertText = function(pos, value) {};
+  this.deleteText = function(pos, len) {};
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// TextAreaEditor
+
+goatee.ta.TextAreaEditor = function(editorEl, model) {
   this.el_ = editorEl;
+  this.reset(model);
 
-  // Bind public methods to this instance.
-  this.setText = this.setText.bind(this);
-  this.insertText = this.insertText.bind(this);
-  this.deleteText = this.deleteText.bind(this);
-
-  this.listeners_ = {};
-  this.listeners_[goatee.EventType.TEXT_INSERT] = [];
-  this.listeners_[goatee.EventType.TEXT_DELETE] = [];
-
-  // Set up listeners to handle user input events. Use keypress to catch char
-  // insertions, keydown to catch backspace/delete. Also catch cut and paste.
+  // Register input handlers. Use keypress to catch char insertions, keydown to
+  // catch backspace/delete. Also catch cut and paste.
   this.el_.addEventListener('keypress', this.handleKeyPress_.bind(this));
   this.el_.addEventListener('keydown', this.handleKeyDown_.bind(this));
   this.el_.addEventListener('cut', this.handleCut_.bind(this));
   this.el_.addEventListener('paste', this.handlePaste_.bind(this));
 };
 
-goatee.TextAreaEditor.prototype.setText = function(text) {
-  this.el_.value = text;
+goatee.ta.TextAreaEditor.prototype.reset = function(model) {
+  this.m_ = model || new goatee.ta.Model_();
+
+  if (model) {
+    // Register model event handlers.
+    this.m_.addEventListener(
+      goatee.EventType.TEXT_INSERT, this.handleInsertText_.bind(this));
+    this.m_.addEventListener(
+      goatee.EventType.TEXT_DELETE, this.handleDeleteText_.bind(this));
+
+    this.el_.value = this.m_.getText();
+  }
 };
 
-goatee.TextAreaEditor.prototype.insertText = function(pos, value) {
+////////////////////////////////////////////////////////////////////////////////
+// Model event handlers
+
+goatee.ta.TextAreaEditor.prototype.handleInsertText_ = function(
+  pos, value, isLocal) {
+  if (isLocal) return;
   var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   var t = this.el_.value;
   this.el_.value = t.substr(0, pos) + value + t.substr(pos);
@@ -45,7 +62,9 @@ goatee.TextAreaEditor.prototype.insertText = function(pos, value) {
   }
 };
 
-goatee.TextAreaEditor.prototype.deleteText = function(pos, len) {
+goatee.ta.TextAreaEditor.prototype.handleDeleteText_ = function(
+  pos, len, isLocal) {
+  if (isLocal) return;
   var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   var t = this.el_.value;
   this.el_.value = t.substr(0, pos) + t.substr(pos + len);
@@ -57,29 +76,10 @@ goatee.TextAreaEditor.prototype.deleteText = function(pos, len) {
   }
 };
 
-goatee.TextAreaEditor.prototype.addEventListener = function(type, handler) {
-  this.listeners_[type].push(handler);
-};
+////////////////////////////////////////////////////////////////////////////////
+// Input handlers
 
-goatee.TextAreaEditor.prototype.removeEventListener = function(type, handler) {
-  goatee.removeFromArray(handler, this.listeners_[type]);
-};
-
-goatee.TextAreaEditor.prototype.logInsertText_ = function(pos, value) {
-  var arr = this.listeners_[goatee.EventType.TEXT_INSERT];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](pos, value);
-  }
-};
-
-goatee.TextAreaEditor.prototype.logDeleteText_ = function(pos, len) {
-  var arr = this.listeners_[goatee.EventType.TEXT_DELETE];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](pos, len);
-  }
-};
-
-goatee.TextAreaEditor.prototype.handleKeyDown_ = function(e) {
+goatee.ta.TextAreaEditor.prototype.handleKeyDown_ = function(e) {
   var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   switch (e.which) {
   case 8:  // backspace
@@ -88,7 +88,7 @@ goatee.TextAreaEditor.prototype.handleKeyDown_ = function(e) {
       var newSelStart = this.el_.selectionStart;
       var len = selEnd - newSelStart;
       if (len > 0) {
-        this.logDeleteText_(newSelStart, len);
+        this.m_.deleteText(newSelStart, len);
       }
     }).bind(this), 0);
     break;
@@ -99,38 +99,38 @@ goatee.TextAreaEditor.prototype.handleKeyDown_ = function(e) {
       var newSize = this.el_.value.length;
       var len = size - newSize;
       if (len > 0) {
-        this.logDeleteText_(selStart, len);
+        this.m_.deleteText(selStart, len);
       }
     }).bind(this), 0);
     break;
   }
 };
 
-goatee.TextAreaEditor.prototype.handleKeyPress_ = function(e) {
+goatee.ta.TextAreaEditor.prototype.handleKeyPress_ = function(e) {
   var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   // If there was a prior selection, log the deletion.
   if (selStart < selEnd) {
-    this.logDeleteText_(selStart, selEnd - selStart);
+    this.m_.deleteText(selStart, selEnd - selStart);
   }
-  this.logInsertText_(selStart, String.fromCharCode(event.which));
+  this.m_.insertText(selStart, String.fromCharCode(event.which));
 };
 
-goatee.TextAreaEditor.prototype.handleCut_ = function(e) {
+goatee.ta.TextAreaEditor.prototype.handleCut_ = function(e) {
   var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   if (selStart < selEnd) {
-    this.logDeleteText_(selStart, selEnd - selStart);
+    this.m_.deleteText(selStart, selEnd - selStart);
   }
 };
 
-goatee.TextAreaEditor.prototype.handlePaste_ = function(e) {
+goatee.ta.TextAreaEditor.prototype.handlePaste_ = function(e) {
   var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
   // If there was a prior selection, log the deletion.
   if (selStart < selEnd) {
-    this.logDeleteText_(selStart, selEnd - selStart);
+    this.m_.deleteText(selStart, selEnd - selStart);
   }
   // Get the pasted content.
   window.setTimeout((function() {
     var newSelStart = this.el_.selectionStart;
-    this.logInsertText_(selStart, this.el_.value.substr(selStart, newSelStart));
+    this.m_.insertText(selStart, this.el_.value.substr(selStart, newSelStart));
   }).bind(this), 0);
 };

@@ -1,10 +1,14 @@
 // See also: https://developers.google.com/drive/realtime/
-
+//
 // TODO:
+//  - Expand listener function signatures to include sessionId, isLocal, type,
+//    and other arguments
 //  - Support >1 Document or Model
 //  - Add mechanism to track cursor positions and other ranges (e.g. bold)
 //  - Maybe add canUndo and canRedo properties
 //  - Check for race conditions
+//
+// FIXME: Send local ops to listeners and set isLocal correctly.
 
 'use strict';
 
@@ -125,7 +129,9 @@ goatee.ot.Document.prototype.pushOp_ = function(op) {
   // If op is parented off server state space (as opposed to some non-acked
   // client op), send it right away.
   if (clientOpIdx === this.ackedClientOpIdx_ + 1) {
-    // Use setTimeout(x, 0) to avoid blocking the client.
+    // Use setTimeout(x, 0) to avoid blocking the client, and to ensure that
+    // combo ops (e.g. delete selection + insert replacement text) are packaged
+    // together.
     window.setTimeout(this.sendBufferedOps_.bind(this), 0);
   }
 };
@@ -139,13 +145,14 @@ goatee.ot.Model = function(doc, text) {
   this.doc_ = doc;
   this.text_ = text;
 
-  // Bind public methods to this instance.
-  this.insertText = this.insertText.bind(this);
-  this.deleteText = this.deleteText.bind(this);
-
   this.listeners_ = {};
   this.listeners_[goatee.EventType.TEXT_INSERT] = [];
   this.listeners_[goatee.EventType.TEXT_DELETE] = [];
+  this.listeners_[goatee.EventType.SET_SELECTION] = [];
+};
+
+goatee.ot.Model.prototype.getText = function() {
+  return this.text_;
 };
 
 goatee.ot.Model.prototype.insertText = function(pos, value) {
@@ -159,6 +166,10 @@ goatee.ot.Model.prototype.deleteText = function(pos, len) {
   console.assert(pos + len <= t.length, 'Delete past end');
   this.text_ = t.substr(0, pos) + t.substr(pos + len);
   this.doc_.pushOp_(new goatee.ot.Delete(pos, len));
+};
+
+goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
+  console.log('setSelectionRange');  // FIXME
 };
 
 goatee.ot.Model.prototype.addEventListener = function(type, handler) {
@@ -175,10 +186,6 @@ goatee.ot.Model.prototype.undo = function() {
 
 goatee.ot.Model.prototype.redo = function() {
   console.log('redo');  // FIXME
-};
-
-goatee.ot.Model.prototype.getText = function() {
-  return this.text_;
 };
 
 goatee.ot.Model.prototype.apply_ = function(op) {
