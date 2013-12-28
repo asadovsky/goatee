@@ -91,7 +91,8 @@ goatee.ot.Document = function(onDocLoaded) {
 };
 
 goatee.ot.Document.prototype.getCollaborators = function() {
-  console.log('getCollaborators');  // FIXME
+  // TODO: Implement.
+  console.log('getCollaborators');
 };
 
 goatee.ot.Document.prototype.getModel = function() {
@@ -143,7 +144,10 @@ goatee.ot.Document.prototype.pushOp_ = function(op) {
 // gapi.drive.realtime.CollaborativeString.
 goatee.ot.Model = function(doc, text) {
   this.doc_ = doc;
+
   this.text_ = text;
+  this.selStart_ = 0;
+  this.selEnd_ = 0;
 
   this.listeners_ = {};
   this.listeners_[goatee.EventType.TEXT_INSERT] = [];
@@ -153,6 +157,10 @@ goatee.ot.Model = function(doc, text) {
 
 goatee.ot.Model.prototype.getText = function() {
   return this.text_;
+};
+
+goatee.ot.Model.prototype.getSelectionRange = function() {
+  return [this.selStart_, this.selEnd_];
 };
 
 goatee.ot.Model.prototype.insertText = function(pos, value) {
@@ -169,7 +177,9 @@ goatee.ot.Model.prototype.deleteText = function(pos, len) {
 };
 
 goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
-  console.log('setSelectionRange');  // FIXME
+  // TODO: Push op to server.
+  this.selStart_ = start;
+  this.selEnd_ = end;
 };
 
 goatee.ot.Model.prototype.addEventListener = function(type, handler) {
@@ -181,11 +191,13 @@ goatee.ot.Model.prototype.removeEventListener = function(type, handler) {
 };
 
 goatee.ot.Model.prototype.undo = function() {
-  console.log('undo');  // FIXME
+  // TODO: Implement.
+  console.log('undo');
 };
 
 goatee.ot.Model.prototype.redo = function() {
-  console.log('redo');  // FIXME
+  // TODO: Implement.
+  console.log('redo');
 };
 
 goatee.ot.Model.prototype.apply_ = function(op) {

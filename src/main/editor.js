@@ -179,6 +179,7 @@ goatee.ed.Cursor_.prototype.move = function(left, bottom, height) {
 
 goatee.ed.Editor = function(editorEl, model) {
   this.el_ = editorEl;
+  this.el_.className = 'goatee-ed';
   this.reset(model);
 
   // Register input handlers.
@@ -216,7 +217,7 @@ goatee.ed.Editor.prototype.reset = function(model) {
 
   this.textEl_ = document.createElement('div');
   this.innerEl_ = document.createElement('div');
-  this.innerEl_.id = 'editor-inner';
+  this.innerEl_.className = 'editor-inner';
   this.innerEl_.appendChild(this.textEl_);
   this.innerEl_.appendChild(this.cursor_.el_);
 

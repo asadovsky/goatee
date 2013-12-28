@@ -1,9 +1,9 @@
-#editor,
-#editor * {
+.goatee-ed,
+.goatee-ed * {
   box-sizing: border-box;
 }
 
-#editor {
+.goatee-ed {
   background: #fff;
   border: 1px solid #999;
   cursor: text;
@@ -14,11 +14,11 @@
   width: 600px;
 }
 
-#editor-inner {
+.goatee-ed .editor-inner {
   position: relative;
 }
 
-.cursor {
+.goatee-ed .cursor {
   background-color: #000;
   border-bottom: 3px solid #fff;
   position: absolute;
@@ -26,17 +26,17 @@
   z-index: 2;
 }
 
-.line {
+.goatee-ed .line {
   min-height: 19px;  /* #editor font-size + .cursor border-bottom */
   position: relative;
 }
 
-.line-inner {
+.goatee-ed .line-inner {
   position: relative;
   z-index: 1;
 }
 
-.highlight {
+.goatee-ed .highlight {
   background-color: #bdf;
   height: 100%;
   position: absolute;
