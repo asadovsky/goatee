@@ -483,7 +483,9 @@ goatee.ed.Editor.prototype.renderSelection_ = function() {
       this.cursor_.hide();
     }
   } else {
-    // TODO: If !this.hasFocus_, make the selection gray.
+    this.cursor_.hide();
+    if (!this.hasFocus_) return;  // hide selection
+
     var text = this.m_.getText();
     var numRows = this.linePOffsets_.length;
     console.assert(numRows === this.textEl_.children.length);
@@ -513,8 +515,6 @@ goatee.ed.Editor.prototype.renderSelection_ = function() {
 
       this.textEl_.children[row].appendChild(el);
     }
-
-    this.cursor_.hide();
   }
 };
 
