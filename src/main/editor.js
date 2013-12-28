@@ -324,6 +324,12 @@ goatee.ed.Editor.prototype.getSelectionOrNull_ = function() {
   }
 };
 
+goatee.ed.Editor.prototype.getCursorPos_ = function() {
+  var tup = this.m_.getSelectionRange(), selStart = tup[0], selEnd = tup[1];
+  console.assert(selStart === selEnd);
+  return selEnd;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // Selection state update methods
 
@@ -603,7 +609,7 @@ goatee.ed.Editor.prototype.handleKeyPress_ = function(e) {
   e.preventDefault();
   if (this.getSelectionOrNull_() !== null) this.deleteSelection_();
 
-  var p = this.m_.getSelectionRange()[1];
+  var p = this.getCursorPos_();
   this.insertText_(p, String.fromCharCode(e.which));
 };
 
@@ -617,7 +623,7 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
     switch (c) {
     case 'V':
       if (sel !== null) this.deleteSelection_();
-      var p = this.m_.getSelectionRange()[1];
+      var p = this.getCursorPos_();
       this.insertText_(p, this.clipboard_);
       break;
     case 'A':
@@ -654,7 +660,7 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
       var selEnd = this.m_.getSelectionRange()[1];
       this.setSelectionFromP_(this.cursorHop_(selEnd, false, e.ctrlKey), false);
     } else if (sel === null) {
-      var p = this.m_.getSelectionRange()[1];
+      var p = this.getCursorPos_();
       this.setSelectionFromP_(this.cursorHop_(p, false, e.ctrlKey), true);
     } else if (e.ctrlKey) {
       this.setSelectionFromP_(this.cursorHop_(sel[0], false, true), true);
@@ -677,7 +683,7 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
       var selEnd = this.m_.getSelectionRange()[1];
       this.setSelectionFromP_(this.cursorHop_(selEnd, true, e.ctrlKey), false);
     } else if (sel === null) {
-      var p = this.m_.getSelectionRange()[1];
+      var p = this.getCursorPos_();
       this.setSelectionFromP_(this.cursorHop_(p, true, e.ctrlKey), true);
     } else if (e.ctrlKey) {
       this.setSelectionFromP_(this.cursorHop_(sel[1], true, true), true);
@@ -698,7 +704,7 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
     if (sel !== null) {
       this.deleteSelection_();
     } else {
-      var p = this.m_.getSelectionRange()[1];
+      var p = this.getCursorPos_();
       var beginP = this.cursorHop_(p, false, e.ctrlKey);
       this.deleteText_(beginP, p - beginP);
     }
@@ -707,7 +713,7 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
     if (sel !== null) {
       this.deleteSelection_();
     } else {
-      var p = this.m_.getSelectionRange()[1];
+      var p = this.getCursorPos_();
       var endP = this.cursorHop_(p, true, e.ctrlKey);
       this.deleteText_(p, endP - p);
     }

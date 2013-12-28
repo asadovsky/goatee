@@ -1,5 +1,3 @@
-// Moved out of SpecRunner.html.
-
 (function() {
   var jasmineEnv = jasmine.getEnv();
   jasmineEnv.updateInterval = 1000;

@@ -195,6 +195,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	ctype := mime.TypeByExtension(filepath.Ext(name))
 	w.Header().Set("Content-Type", ctype)
 
+	// FIXME
 	if name != "index.html" && name != "editor.html" {
 		b, err := ioutil.ReadFile(name)
 		util.PanicOnError(err)
