@@ -18,12 +18,6 @@
 // OT-specific TODO:
 //  - Show all cursors and selections
 //  - Smarter handling of cursor_.prevLeft on non-local text mutations
-//
-// Bugs:
-//  - Fill 1.5 rows of W char, then shift+end in first row, then hit down.
-//    Cursor should move down a row, but instead the selection doesn't change.
-//  - Fill 1.5 rows of W char, then select all. Extra space selected at the end
-//    of the first row.
 
 'use strict';
 
@@ -345,10 +339,11 @@ goatee.ed.Editor.prototype.getCursorPos_ = function() {
 goatee.ed.Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
   // TODO: If nothing has changed, don't update model or render.
   this.cursor_.prevLeft = null;
+  this.cursor_.append = false;
+
   if (!updateSelStart) {
     this.m_.setSelectionRange(this.m_.getSelectionRange()[0], p);
   } else {
-    this.cursor_.append = false;
     this.m_.setSelectionRange(p, p);
   }
 };
@@ -375,14 +370,13 @@ goatee.ed.Editor.prototype.setSelectionFromRowAndX_ = function(
 
   // TODO: If nothing has changed, don't update model or render.
   if (clearPrevLeft) this.cursor_.prevLeft = null;
+  // If the character at position p is actually on the next line, switch cursor
+  // state to "append" mode.
+  this.cursor_.append = (p === beginEnd[1] && p > beginEnd[0]);
+
   if (!updateSelStart) {
     this.m_.setSelectionRange(this.m_.getSelectionRange()[0], p);
   } else {
-    // If the character at position p is actually on the next line, switch
-    // cursor state to "append" mode.
-    // FIXME: This should probably be done even if !updateSelStart. See bug
-    // description up top.
-    this.cursor_.append = (p === beginEnd[1] && p > beginEnd[0]);
     this.m_.setSelectionRange(p, p);
   }
 };

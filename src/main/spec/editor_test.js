@@ -88,14 +88,12 @@ var text = function() {
   return editor.getText();
 };
 
-// Returns the current cursor position.
+// Returns the current cursor (selEnd) position.
 var curPos = function() {
-  var tup = editor.getSelectionRange(), selStart = tup[0], selEnd = tup[1];
-  expect(selStart).toEqual(selEnd);
-  return selEnd;
+  return editor.getSelectionRange()[1];
 };
 
-// Returns the current cursor [pos, row, left].
+// Returns the current cursor (selEnd) [pos, row, left].
 var curState = function() {
   return [curPos(), editor.cursor_.row, editor.cursor_.left];
 };
@@ -591,8 +589,7 @@ describe('Editor rendering', function() {
   });
 
   it('up/down with wrapped line', function() {
-    var w10 = repeat('W', 10);
-    var w50 = repeat('W', 50);
+    var w10 = repeat('W', 10), w50 = repeat('W', 50);
     type(w50 + '\r\r' + w50 + '\r' + w10);
 
     expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
@@ -692,6 +689,32 @@ describe('Editor rendering', function() {
     expect(curState()).toEqual([13, 4, 2 * SPACE_WIDTH]);
     fireKeyDownSeq('down down down');
     expect(curState()).toEqual([18, 6, 0]);
+  });
+
+  it('select to end of wrapped line, then up/down', function() {
+    var w10 = repeat('W', 10), w50 = repeat('W', 50);
+    type(w50);
+    fireKeyDownSeq('home left home');
+    expect(curState()).toEqual([0, 0, 0]);
+    fireKeyDownSeq('shift+end');
+    expect(curState()).toEqual([37, 0, 37 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([37, 0, 37 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
+
+    editor.reset();
+    type(w10 + '\r' + w50);
+    fireKeyDownSeq('home left home');
+    expect(curState()).toEqual([11, 1, 0]);
+    fireKeyDownSeq('shift+end');
+    expect(curState()).toEqual([11 + 37, 1, 37 * W_WIDTH]);
+    fireKeyDownSeq('up');
+    expect(curState()).toEqual([10, 0, 10 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([11 + 37, 1, 37 * W_WIDTH]);
+    fireKeyDownSeq('down');
+    expect(curState()).toEqual([11 + 50, 2, 13 * W_WIDTH]);
   });
 
   it('ctrl+up/down', function() {
