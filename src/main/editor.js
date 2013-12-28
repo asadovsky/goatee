@@ -62,8 +62,6 @@ goatee.ed.HtmlSizer_.prototype.height = function(html) {
 ////////////////////////////////////////////////////////////////////////////////
 // Model_
 
-// FIXME: Set isLocal correctly.
-
 goatee.ed.Model_ = function() {
   this.text_ = '';
   this.selStart_ = 0;
@@ -90,7 +88,7 @@ goatee.ed.Model_.prototype.insertText = function(pos, value) {
 
   var arr = this.listeners_[goatee.EventType.TEXT_INSERT];
   for (var i = 0; i < arr.length; i++) {
-    arr[i](pos, value);
+    arr[i](pos, value, true);
   }
 };
 
@@ -101,7 +99,7 @@ goatee.ed.Model_.prototype.deleteText = function(pos, len) {
 
   var arr = this.listeners_[goatee.EventType.TEXT_DELETE];
   for (var i = 0; i < arr.length; i++) {
-    arr[i](pos, len);
+    arr[i](pos, len, true);
   }
 };
 
@@ -111,7 +109,7 @@ goatee.ed.Model_.prototype.setSelectionRange = function(start, end) {
 
   var arr = this.listeners_[goatee.EventType.SET_SELECTION];
   for (var i = 0; i < arr.length; i++) {
-    arr[i](start, end);
+    arr[i](start, end, true);
   }
 };
 
@@ -210,7 +208,6 @@ goatee.ed.Editor.prototype.reset = function(model) {
     goatee.EventType.SET_SELECTION, this.handleSetSelectionRange_.bind(this));
 
   // Reset internal state.
-  // FIXME: Handle non-empty model state.
   this.hasFocus_ = true;
   this.mouseIsDown_ = false;
 
@@ -238,6 +235,8 @@ goatee.ed.Editor.prototype.reset = function(model) {
   this.innerWidth_ = parseInt(window.getComputedStyle(
     this.innerEl_, null).getPropertyValue('width'), 10);
 
+  // Initialize charSizes_ to handle non-empty initial model state.
+  this.initCharSizes_();
   this.renderAll_();
 };
 
@@ -281,6 +280,15 @@ goatee.ed.Editor.prototype.handleSetSelectionRange_ = function(
 
 ////////////////////////////////////////////////////////////////////////////////
 // Utility methods
+
+goatee.ed.Editor.prototype.initCharSizes_ = function() {
+  var text = this.m_.getText();
+  this.charSizes_ = new Array(text.length);
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    this.charSizes_[i] = this.hs_.size(this.makeLineHtml_(c, i));
+  }
+};
 
 goatee.ed.Editor.prototype.rowFromY_ = function(y) {
   var row;

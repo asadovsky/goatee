@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"code.google.com/p/go.net/websocket"
@@ -195,17 +196,21 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	ctype := mime.TypeByExtension(filepath.Ext(name))
 	w.Header().Set("Content-Type", ctype)
 
-	// FIXME
-	if name != "index.html" && name != "editor.html" {
+	if strings.HasSuffix(name, "html") {
+		tmpl := template.Must(template.ParseGlob("*.html"))
+		data := struct {
+			Name   string
+			Socket template.URL
+		}{
+			name,
+			template.URL(fmt.Sprintf("ws://%s/ws", listenAddr)),
+		}
+		util.PanicOnError(tmpl.ExecuteTemplate(w, name, data))
+	} else {
 		b, err := ioutil.ReadFile(name)
 		util.PanicOnError(err)
 		w.Write(b)
-		return
 	}
-
-	tmpl := template.Must(template.ParseGlob("*.*"))
-	util.PanicOnError(tmpl.ExecuteTemplate(
-		w, name, template.URL(fmt.Sprintf("ws://%s/ws", listenAddr))))
 }
 
 func main() {
