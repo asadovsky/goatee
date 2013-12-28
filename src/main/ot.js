@@ -1,14 +1,12 @@
 // See also: https://developers.google.com/drive/realtime/
 //
 // TODO:
-//  - Expand listener function signatures to include sessionId, isLocal, type,
-//    and other arguments
+//  - Change model event handlers to take event objects
+//  - Expand event objects to include sessionId, type, and other fields
 //  - Support >1 Document or Model
 //  - Add mechanism to track cursor positions and other ranges (e.g. bold)
 //  - Maybe add canUndo and canRedo properties
 //  - Check for race conditions
-//
-// FIXME: Send local ops to listeners and set isLocal correctly.
 
 'use strict';
 
@@ -86,7 +84,7 @@ goatee.ot.Document = function(onDocLoaded) {
       this.clientOps_[this.ackedClientOpIdx_ + 1 + i] = bufferedOps[i];
     }
     // Apply the transformed server compound op against the client text.
-    this.model_.applyCompound_(ops);
+    this.model_.applyCompound_(ops, false);
   }).bind(this);
 };
 
@@ -125,6 +123,9 @@ goatee.ot.Document.prototype.sendBufferedOps_ = function() {
 };
 
 goatee.ot.Document.prototype.pushOp_ = function(op) {
+  // Apply op locally and notify listeners.
+  this.model_.apply_(op, true);
+  // Schedule op to be sent to server.
   var clientOpIdx = this.clientOps_.length;
   this.clientOps_.push(op);
   // If op is parented off server state space (as opposed to some non-acked
@@ -164,22 +165,21 @@ goatee.ot.Model.prototype.getSelectionRange = function() {
 };
 
 goatee.ot.Model.prototype.insertText = function(pos, value) {
-  var t = this.text_;
-  this.text_ = t.substr(0, pos) + value + t.substr(pos);
   this.doc_.pushOp_(new goatee.ot.Insert(pos, value));
 };
 
 goatee.ot.Model.prototype.deleteText = function(pos, len) {
-  var t = this.text_;
-  console.assert(pos + len <= t.length, 'Delete past end');
-  this.text_ = t.substr(0, pos) + t.substr(pos + len);
   this.doc_.pushOp_(new goatee.ot.Delete(pos, len));
 };
 
 goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
-  // TODO: Push op to server.
+  // TODO: Push op to server. For now, we manually notify listeners.
   this.selStart_ = start;
   this.selEnd_ = end;
+  var arr = this.listeners_[goatee.EventType.SET_SELECTION];
+  for (var i = 0; i < arr.length; i++) {
+    arr[i](start, end, true);
+  }
 };
 
 goatee.ot.Model.prototype.addEventListener = function(type, handler) {
@@ -200,22 +200,42 @@ goatee.ot.Model.prototype.redo = function() {
   console.log('redo');
 };
 
-goatee.ot.Model.prototype.apply_ = function(op) {
+goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
   var t = this.text_;
   switch (op.typeName()) {
   case 'Insert':
     this.text_ = t.substr(0, op.pos) + op.value + t.substr(op.pos);
+    // Update selection range.
+    if (isLocal) {
+      this.selStart_ = op.pos + op.value.length;
+      this.selEnd_ = this.selStart_;
+    } else {
+      if (this.selStart_ >= op.pos) this.selStart_ += op.value.length;
+      if (this.selEnd_ >= op.pos) this.selEnd_ += op.value.length;
+    }
     var arr = this.listeners_[goatee.EventType.TEXT_INSERT];
     for (var i = 0; i < arr.length; i++) {
-      arr[i](op.pos, op.value);
+      arr[i](op.pos, op.value, isLocal);
     }
     break;
   case 'Delete':
     console.assert(op.pos + op.len <= t.length, 'Delete past end');
     this.text_ = t.substr(0, op.pos) + t.substr(op.pos + op.len);
+    // Update selection range.
+    if (isLocal) {
+      this.selStart_ = op.pos;
+      this.selEnd_ = this.selStart_;
+    } else {
+      if (this.selStart_ > op.pos) {
+        this.selStart_ = Math.max(op.pos, this.selStart_ - op.len);
+      }
+      if (this.selEnd_ > op.pos) {
+        this.selEnd_ = Math.max(op.pos, this.selEnd_ - op.len);
+      }
+    }
     var arr = this.listeners_[goatee.EventType.TEXT_DELETE];
     for (var i = 0; i < arr.length; i++) {
-      arr[i](op.pos, op.len);
+      arr[i](op.pos, op.len, isLocal);
     }
     break;
   default:
@@ -223,8 +243,8 @@ goatee.ot.Model.prototype.apply_ = function(op) {
   }
 };
 
-goatee.ot.Model.prototype.applyCompound_ = function(ops) {
+goatee.ot.Model.prototype.applyCompound_ = function(ops, isLocal) {
   for (var i = 0; i < ops.length; i++) {
-    this.apply_(ops[i]);
+    this.apply_(ops[i], isLocal);
   }
 };

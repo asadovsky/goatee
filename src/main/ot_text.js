@@ -103,7 +103,7 @@ goatee.ot.transform = function(a, b) {
         return [new goatee.ot.Delete(a.pos - b.len, a.len), b];
       }
       var pos = Math.min(a.pos, b.pos);
-      var overlap = Math.max(0, Math.min(aEnd, bEnd) - math.Max(a.pos, b.pos));
+      var overlap = Math.max(0, Math.min(aEnd, bEnd) - Math.max(a.pos, b.pos));
       console.assert(overlap > 0);
       return [new goatee.ot.Delete(pos, a.len - overlap),
               new goatee.ot.Delete(pos, b.len - overlap)];

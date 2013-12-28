@@ -115,12 +115,17 @@ var repeat = function(s, n) {
   return res;
 };
 
+var resetEditor = function() {
+  editor.reset();
+  editor.focus();
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // Tests
 
 describe('Editor keyboard basics', function() {
   beforeEach(function() {
-    editor.reset();
+    resetEditor();
     expect(state()).toEqual(['', 0]);
   });
 
@@ -252,7 +257,7 @@ describe('Editor keyboard basics', function() {
 
     // Non-alphanumeric chars (including newlines and periods) should behave the
     // same way as spaces.
-    editor.reset();
+    resetEditor();
     t = 'aa+/.\r|3a';
     type(t);
     expect(state()).toEqual([t, 9]);
@@ -266,7 +271,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 9]);
 
     // Leading and trailing spaces.
-    editor.reset();
+    resetEditor();
     t = '  ';
     type(t);
     expect(state()).toEqual([t, 2]);
@@ -369,7 +374,7 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual([t, 3]);
 
     // Leading and trailing spaces.
-    editor.reset();
+    resetEditor();
     t = '  ';
     type(t);
     expect(state()).toEqual([t, 2]);
@@ -482,7 +487,7 @@ describe('Editor keyboard basics', function() {
 
 describe('Editor rendering', function() {
   beforeEach(function() {
-    editor.reset();
+    resetEditor();
     expect(state()).toEqual(['', 0]);
   });
 
@@ -516,7 +521,7 @@ describe('Editor rendering', function() {
     expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
 
     // This time, a wrapped line with a space.
-    editor.reset();
+    resetEditor();
     var w29_w20 = repeat('W', 29) + ' ' + repeat('W', 20);
     type(w29_w20);
     expect(state()).toEqual([w29_w20, 50]);
@@ -622,7 +627,7 @@ describe('Editor rendering', function() {
     expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
 
     // This time, a wrapped line with a space.
-    editor.reset();
+    resetEditor();
     var w10 = repeat('W', 10);
     var w29_w18_w = repeat('W', 29) + ' ' + repeat('W', 18) + ' ' + 'W';
     type(w29_w18_w + '\r\r' + w29_w18_w + '\r' + w10);
@@ -703,7 +708,7 @@ describe('Editor rendering', function() {
     fireKeyDownSeq('down');
     expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
 
-    editor.reset();
+    resetEditor();
     type(w10 + '\r' + w50);
     fireKeyDownSeq('home left home');
     expect(curState()).toEqual([11, 1, 0]);
@@ -737,7 +742,7 @@ describe('Editor rendering', function() {
 // TODO: Test keyboard shortcuts on non-Mac (i.e. ctrlKey instead of metaKey).
 describe('Editor keyboard shortcuts', function() {
   beforeEach(function() {
-    editor.reset();
+    resetEditor();
     expect(state()).toEqual(['', 0]);
   });
 
@@ -806,7 +811,7 @@ describe('Editor keyboard shortcuts', function() {
 
 describe('Editor mouse', function() {
   beforeEach(function() {
-    editor.reset();
+    resetEditor();
     expect(state()).toEqual(['', 0]);
   });
 });

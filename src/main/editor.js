@@ -16,6 +16,7 @@
 //  - Play with React (http://facebook.github.io/react/)
 //
 // OT-specific TODO:
+//  - Change model event handlers to take event objects
 //  - Show all cursors and selections
 //  - Smarter handling of cursor_.prevLeft on non-local text mutations
 
@@ -203,7 +204,7 @@ goatee.ed.Editor.prototype.reset = function(model) {
     goatee.EventType.SET_SELECTION, this.handleSetSelectionRange_.bind(this));
 
   // Reset internal state.
-  this.hasFocus_ = true;
+  this.hasFocus_ = false;
   this.mouseIsDown_ = false;
 
   this.clipboard_ = '';
@@ -238,6 +239,11 @@ goatee.ed.Editor.prototype.reset = function(model) {
 ////////////////////////////////////////////////////////////////////////////////
 // Public methods
 
+goatee.ed.Editor.prototype.focus = function() {
+  this.hasFocus_ = true;
+  this.renderSelection_();
+};
+
 goatee.ed.Editor.prototype.getText = function() {
   return this.m_.getText();
 };
@@ -270,6 +276,7 @@ goatee.ed.Editor.prototype.handleDeleteText_ = function(
 
 goatee.ed.Editor.prototype.handleSetSelectionRange_ = function(
   start, end, isLocal) {
+  if (!isLocal) return;
   this.renderSelection_();
 };
 

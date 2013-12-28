@@ -2,6 +2,7 @@
 //
 // TODO:
 //  - Catch undo/redo, maybe using 'input' event
+//  - Check for race conditions
 
 'use strict';
 
@@ -36,10 +37,9 @@ goatee.ta.TextAreaEditor.prototype.reset = function(model) {
 
   if (model) {
     // Register model event handlers.
-    this.m_.addEventListener(
-      goatee.EventType.TEXT_INSERT, this.handleInsertText_.bind(this));
-    this.m_.addEventListener(
-      goatee.EventType.TEXT_DELETE, this.handleDeleteText_.bind(this));
+    var handler = this.handleModifyText_.bind(this);
+    this.m_.addEventListener(goatee.EventType.TEXT_INSERT, handler);
+    this.m_.addEventListener(goatee.EventType.TEXT_DELETE, handler);
 
     this.el_.value = this.m_.getText();
   }
@@ -48,31 +48,14 @@ goatee.ta.TextAreaEditor.prototype.reset = function(model) {
 ////////////////////////////////////////////////////////////////////////////////
 // Model event handlers
 
-goatee.ta.TextAreaEditor.prototype.handleInsertText_ = function(
-  pos, value, isLocal) {
+// Handles both TEXT_INSERT and TEXT_DELETE.
+goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(
+  x, y, isLocal) {
   if (isLocal) return;
-  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
-  var t = this.el_.value;
-  this.el_.value = t.substr(0, pos) + value + t.substr(pos);
-  // If this editor has focus, update its cursor position.
+  this.el_.value = this.m_.getText();
+  // If this editor has focus, update its selection/cursor position.
   if (document.activeElement === this.el_) {
-    if (selStart >= pos) selStart += value.length;
-    if (selEnd >= pos) selEnd += value.length;
-    this.el_.setSelectionRange(selStart, selEnd);
-  }
-};
-
-goatee.ta.TextAreaEditor.prototype.handleDeleteText_ = function(
-  pos, len, isLocal) {
-  if (isLocal) return;
-  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
-  var t = this.el_.value;
-  this.el_.value = t.substr(0, pos) + t.substr(pos + len);
-  // If this editor has focus, update its cursor position.
-  if (document.activeElement === this.el_) {
-    if (selStart > pos) selStart = Math.max(pos, selStart - len);
-    if (selEnd > pos) selEnd = Math.max(pos, selEnd - len);
-    this.el_.setSelectionRange(selStart, selEnd);
+    this.el_.setSelectionRange(this.m_.getSelectionRange());
   }
 };
 
