@@ -12,3 +12,11 @@ goatee.removeFromArray = function(value, arr) {
     arr.splice(i, 1);
   }
 };
+
+goatee.isAlphaNum = function(s) {
+  return (/[A-Za-z0-9]/g).test(s);
+};
+
+goatee.canonicalizeLineBreaks = function(s) {
+  return s.replace(/(\r\n|\r|\n)/g, '\n');
+};

@@ -69,10 +69,11 @@ goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(e) {
 // Input handlers
 
 goatee.ta.TextAreaEditor.prototype.handleInput_ = function(e) {
+  var oldText = this.m_.getText();
+  var newText = goatee.canonicalizeLineBreaks(this.el_.value);
+
   // Note, oldText can equal newText, e.g. if user selects all, then copies,
   // then pastes.
-  var oldText = this.m_.getText(), newText = this.el_.value;
-
   var minLen = Math.min(oldText.length, newText.length);
   var l = 0, r = 0;
   while (l < minLen && oldText.charAt(l) === newText.charAt(l)) l++;
@@ -90,6 +91,8 @@ goatee.ta.TextAreaEditor.prototype.handleInput_ = function(e) {
 
 goatee.ta.TextAreaEditor.prototype.updateSelection_ = function() {
   window.setTimeout((function() {
+    // TODO: Do we need to canonicalize line breaks first, to avoid having \r\n
+    // count as two chars?
     this.m_.setSelectionRange(this.el_.selectionStart, this.el_.selectionEnd);
   }).bind(this), 0);
 };

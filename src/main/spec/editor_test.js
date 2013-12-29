@@ -36,13 +36,12 @@ var KEY_CODES = {
 // Returns a keypress event for the given character.
 var makeKeyPressEvent = function(k) {
   console.assert(k.length === 1, k);
-  // http://stackoverflow.com/questions/8942678/keyboardevent-in-chrome-keycode-is-0
-  // This is a good example of where using jQuery would've probably saved time.
+  // https://code.google.com/p/chromium/issues/detail?id=327853
   var e = document.createEvent('Events');
   // KeyboardEvents bubble and are cancelable.
   // https://developer.mozilla.org/en-US/docs/Web/API/event.initEvent
   e.initEvent('keypress', true, true);
-  e.which = k.charCodeAt(0);
+  e.which = goatee.canonicalizeLineBreaks(k).charCodeAt(0);
   return e;
 };
 
@@ -52,15 +51,15 @@ var makeKeyPressEvent = function(k) {
 var makeKeyDownEvent = function(cmd) {
   console.assert(cmd.length > 0);
   var lastPlus = cmd.lastIndexOf('+');
-  var key = lastPlus === -1 ? cmd : cmd.substr(lastPlus + 1);
+  var k = lastPlus === -1 ? cmd : cmd.substr(lastPlus + 1);
   // See comments in makeKeyPressEvent.
   var e = document.createEvent('Events');
   e.initEvent('keydown', true, true);
-  if (key.length > 1) {
-    console.assert(KEY_CODES[key] !== undefined, key);
-    e.which = KEY_CODES[key];
+  if (k.length > 1) {
+    console.assert(KEY_CODES[k] !== undefined, k);
+    e.which = KEY_CODES[k];
   } else {
-    e.which = key.charCodeAt(0);
+    e.which = goatee.canonicalizeLineBreaks(k).charCodeAt(0);
   }
   e.shiftKey = cmd.indexOf('shift') !== -1;
   e.ctrlKey = cmd.indexOf('ctrl') !== -1;
@@ -162,8 +161,8 @@ describe('Editor keyboard basics', function() {
     expect(curPos()).toEqual(4);
 
     // Now with some newline chars.
-    type('h\rij\r');
-    expect(state()).toEqual(['fgabh\rij\rdec', 9]);
+    type('h\nij\n');
+    expect(state()).toEqual(['fgabh\nij\ndec', 9]);
     fireKeyDownSeq('left left left left left');
     expect(curPos()).toEqual(4);
     fireKeyDownSeq('right right right right right');
@@ -186,9 +185,9 @@ describe('Editor keyboard basics', function() {
     expect(state()).toEqual(['', 0]);
 
     // Now with some newline chars.
-    type('h\rij\rk');
+    type('h\nij\nk');
     fireKeyDownSeq('left left left');
-    expect(state()).toEqual(['h\rij\rk', 3]);
+    expect(state()).toEqual(['h\nij\nk', 3]);
     fireKeyDownSeq('backspace backspace delete delete');
     expect(state()).toEqual(['hk', 1]);
   });
@@ -208,7 +207,7 @@ describe('Editor keyboard basics', function() {
   });
 
   it('home/end with newlines', function() {
-    type('123\r456\r789');
+    type('123\n456\n789');
     expect(curPos()).toEqual(11);
     fireKeyDownSeq('end');
     expect(curPos()).toEqual(11);
@@ -258,7 +257,7 @@ describe('Editor keyboard basics', function() {
     // Non-alphanumeric chars (including newlines and periods) should behave the
     // same way as spaces.
     resetEditor();
-    t = 'aa+/.\r|3a';
+    t = 'aa+/.\n|3a';
     type(t);
     expect(state()).toEqual([t, 9]);
     fireKeyDownSeq('ctrl+left');
@@ -548,10 +547,10 @@ describe('Editor render-based state', function() {
 
   it('up/down', function() {
     var w10 = repeat('W', 10);
-    type(w10 + '\r' +
-         w10 + w10 + '\r' +
-         w10 + '\r' +
-         '\r' +
+    type(w10 + '\n' +
+         w10 + w10 + '\n' +
+         w10 + '\n' +
+         '\n' +
          w10 + w10);
 
     expect(curState()).toEqual([64, 4, 20 * W_WIDTH]);
@@ -595,7 +594,7 @@ describe('Editor render-based state', function() {
 
   it('up/down with wrapped line', function() {
     var w10 = repeat('W', 10), w50 = repeat('W', 50);
-    type(w50 + '\r\r' + w50 + '\r' + w10);
+    type(w50 + '\n\n' + w50 + '\n' + w10);
 
     expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
     fireKeyDownSeq('up');
@@ -630,7 +629,7 @@ describe('Editor render-based state', function() {
     resetEditor();
     var w10 = repeat('W', 10);
     var w29_w18_w = repeat('W', 29) + ' ' + repeat('W', 18) + ' ' + 'W';
-    type(w29_w18_w + '\r\r' + w29_w18_w + '\r' + w10);
+    type(w29_w18_w + '\n\n' + w29_w18_w + '\n' + w10);
 
     expect(curState()).toEqual([52 + 51 + 10, 5, 10 * W_WIDTH]);
     fireKeyDownSeq('up');
@@ -659,7 +658,7 @@ describe('Editor render-based state', function() {
   });
 
   it('up/down with chars of different widths', function() {
-    type('W\rTT\rW \rTW\r    \rW\r');
+    type('W\nTT\nW \nTW\n    \nW\n');
     // This test relies on the following invariants.
     expect(T_WIDTH * 1.5).toEqual(W_WIDTH);
     expect(SPACE_WIDTH * 2.5).toEqual(T_WIDTH);
@@ -709,7 +708,7 @@ describe('Editor render-based state', function() {
     expect(curState()).toEqual([50, 1, 13 * W_WIDTH]);
 
     resetEditor();
-    type(w10 + '\r' + w50);
+    type(w10 + '\n' + w50);
     fireKeyDownSeq('home left home');
     expect(curState()).toEqual([11, 1, 0]);
     fireKeyDownSeq('shift+end');

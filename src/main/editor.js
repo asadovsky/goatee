@@ -293,21 +293,19 @@ goatee.ed.Editor.prototype.rowFromY_ = function(y) {
   return row;
 };
 
-goatee.ed.Editor.ALPHANUM_RE_ = /[A-Za-z0-9]/;
-
 goatee.ed.Editor.prototype.cursorHop_ = function(p, forward, hop) {
-  var text = this.m_.getText(), anre = goatee.ed.Editor.ALPHANUM_RE_;
+  var text = this.m_.getText();
   if (forward) {
     if (hop) {
-      while (p < text.length && !anre.test(text.charAt(p))) p++;
-      while (p < text.length && anre.test(text.charAt(p))) p++;
+      while (p < text.length && !goatee.isAlphaNum(text.charAt(p))) p++;
+      while (p < text.length && goatee.isAlphaNum(text.charAt(p))) p++;
     } else if (p < text.length) {
       p++;
     }
   } else {  // backward
     if (hop) {
-      while (p > 0 && !anre.test(text.charAt(p - 1))) p--;
-      while (p > 0 && anre.test(text.charAt(p - 1))) p--;
+      while (p > 0 && !goatee.isAlphaNum(text.charAt(p - 1))) p--;
+      while (p > 0 && goatee.isAlphaNum(text.charAt(p - 1))) p--;
     } else if (p > 0) {
       p--;
     }
@@ -354,7 +352,7 @@ goatee.ed.Editor.prototype.setSelectionFromRowAndX_ = function(
   // Find char whose left is closest to x.
   var beginEnd = this.linePOffsets_[row];
   var pEnd = beginEnd[1];
-  if (pEnd > 0 && this.m_.getText().charAt(pEnd - 1) === '\r') pEnd--;
+  if (pEnd > 0 && this.m_.getText().charAt(pEnd - 1) === '\n') pEnd--;
 
   var p = beginEnd[0], left = 0;
   for (; p < pEnd; p++) {
@@ -403,18 +401,19 @@ goatee.ed.Editor.prototype.makeLineHtml_ = function(text, p) {
   var len = text.length;
   for (var i = 0; i < len; i++) {
     var c = text.charAt(i);
-    if (c === '\r') {
+    if (c === '\n') {
       c = '';
     } else {
       c = goatee.ed.Editor.escapeChar_(c);
     }
-    console.assert(!/\s/.test(c));
+    console.assert(!/\s/.test(c), c.charCodeAt(0));
     res += c;
   }
   return '<div class="line"><div class="line-inner">' + res + '</div></div>';
 };
 
 goatee.ed.Editor.prototype.insertText_ = function(p, value) {
+  value = goatee.canonicalizeLineBreaks(value);
   this.cursor_.append = false;
   this.cursor_.prevLeft = null;
   this.m_.insertText(p, value);
@@ -495,7 +494,7 @@ goatee.ed.Editor.prototype.renderSelection_ = function() {
 
       // Compute right (or width).
       if (sel[1] > beginEnd[1] ||
-          (sel[1] === beginEnd[1] && text.charAt(beginEnd[1] - 1) === '\r')) {
+          (sel[1] === beginEnd[1] && text.charAt(beginEnd[1] - 1) === '\n')) {
         el.style.right = '0';
       } else {
         var width = 0;
@@ -534,7 +533,7 @@ goatee.ed.Editor.prototype.renderAll_ = function() {
   while (p < text.length) {
     var c = text.charAt(p);
     lineText += c;
-    if (c === '\r') {
+    if (c === '\n') {
       p++;
     } else {
       lineWidth += this.charSizes_[p][0];

@@ -15,6 +15,7 @@ goatee.ot = goatee.ot || {};
 
 goatee.ot.DEBUG_DELAY = 0;
 goatee.ot.DEBUG_SOCKET = false;
+goatee.ot.DEBUG_EVENTS = true;
 
 // Similar to gapi.drive.realtime.load.
 goatee.ot.load = function(docId, onDocLoaded) {
@@ -146,6 +147,7 @@ goatee.ot.Document.prototype.pushOp_ = function(op) {
 goatee.ot.Model = function(doc, text) {
   this.doc_ = doc;
 
+  // Note, we assume line breaks have been canonicalized to \n.
   this.text_ = text;
   this.selStart_ = 0;
   this.selEnd_ = 0;
@@ -245,6 +247,7 @@ goatee.ot.Model.prototype.applyCompound_ = function(ops, isLocal) {
 };
 
 goatee.ot.Model.prototype.broadcastEvent_ = function(e) {
+  if (goatee.ot.DEBUG_EVENTS) console.log(e);
   var arr = this.listeners_[e.type];
   for (var i = 0; i < arr.length; i++) {
     arr[i](e);
