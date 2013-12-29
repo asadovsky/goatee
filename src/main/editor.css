@@ -10,8 +10,9 @@
   font-family: arial, sans-serif;
   font-size: 16px;
   line-height: 16px;  /* equal to font-size */
-  padding: 20px;
-  width: 600px;
+  padding: 10px;
+  width: 580px;
+  min-height: 200px;
 }
 
 .goatee-ed .editor-inner {

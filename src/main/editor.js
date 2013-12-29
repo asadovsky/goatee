@@ -80,32 +80,20 @@ goatee.ed.Model_.prototype.insertText = function(pos, value) {
   this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos);
   this.selStart_ = pos + value.length;
   this.selEnd_ = this.selStart_;
-
-  var arr = this.listeners_[goatee.EventType.INSERT_TEXT];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](pos, value, true);
-  }
+  this.broadcastEvent_(new goatee.InsertTextEvent(true, pos, value));
 };
 
 goatee.ed.Model_.prototype.deleteText = function(pos, len) {
   this.text_ = this.text_.substr(0, pos) + this.text_.substr(pos + len);
   this.selStart_ = pos;
   this.selEnd_ = this.selStart_;
-
-  var arr = this.listeners_[goatee.EventType.DELETE_TEXT];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](pos, len, true);
-  }
+  this.broadcastEvent_(new goatee.DeleteTextEvent(true, pos, len));
 };
 
 goatee.ed.Model_.prototype.setSelectionRange = function(start, end) {
   this.selStart_ = start;
   this.selEnd_ = end;
-
-  var arr = this.listeners_[goatee.EventType.SET_SELECTION_RANGE];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](start, end, true);
-  }
+  this.broadcastEvent_(new goatee.SetSelectionRangeEvent(true, start, end));
 };
 
 goatee.ed.Model_.prototype.addEventListener = function(type, handler) {
@@ -114,6 +102,13 @@ goatee.ed.Model_.prototype.addEventListener = function(type, handler) {
 
 goatee.ed.Model_.prototype.removeEventListener = function(type, handler) {
   goatee.removeFromArray(handler, this.listeners_[type]);
+};
+
+goatee.ed.Model_.prototype.broadcastEvent_ = function(e) {
+  var arr = this.listeners_[e.type];
+  for (var i = 0; i < arr.length; i++) {
+    arr[i](e);
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,28 +251,25 @@ goatee.ed.Editor.prototype.getSelectionRange = function() {
 ////////////////////////////////////////////////////////////////////////////////
 // Model event handlers
 
-goatee.ed.Editor.prototype.handleInsertText_ = function(
-  pos, value, isLocal) {
-  var valueCharSizes = new Array(value.length);
-  for (var i = 0; i < value.length; i++) {
-    var c = value.charAt(i);
-    valueCharSizes[i] = this.hs_.size(this.makeLineHtml_(c, pos + i));
+goatee.ed.Editor.prototype.handleInsertText_ = function(e) {
+  var valueCharSizes = new Array(e.value.length);
+  for (var i = 0; i < e.value.length; i++) {
+    var c = e.value.charAt(i);
+    valueCharSizes[i] = this.hs_.size(this.makeLineHtml_(c, e.pos + i));
   }
-  this.charSizes_ = this.charSizes_.slice(0, pos).concat(
-    valueCharSizes, this.charSizes_.slice(pos));
+  this.charSizes_ = this.charSizes_.slice(0, e.pos).concat(
+    valueCharSizes, this.charSizes_.slice(e.pos));
 
   this.renderAll_();
 };
 
-goatee.ed.Editor.prototype.handleDeleteText_ = function(
-  pos, len, isLocal) {
-  this.charSizes_.splice(pos, len);
+goatee.ed.Editor.prototype.handleDeleteText_ = function(e) {
+  this.charSizes_.splice(e.pos, e.len);
   this.renderAll_();
 };
 
-goatee.ed.Editor.prototype.handleSetSelectionRange_ = function(
-  start, end, isLocal) {
-  if (!isLocal) return;
+goatee.ed.Editor.prototype.handleSetSelectionRange_ = function(e) {
+  if (!e.isLocal) return;
   this.renderSelection_();
 };
 

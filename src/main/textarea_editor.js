@@ -1,6 +1,7 @@
 // Defines TextAreaEditor class.
 //
 // TODO:
+//  - Notify model of changes to selection range
 //  - Catch undo/redo, maybe using 'input' event
 //  - Check for race conditions
 
@@ -49,13 +50,14 @@ goatee.ta.TextAreaEditor.prototype.reset = function(model) {
 // Model event handlers
 
 // Handles both INSERT_TEXT and DELETE_TEXT.
-goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(
-  x, y, isLocal) {
-  if (isLocal) return;
+goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(e) {
+  if (e.isLocal) return;
   this.el_.value = this.m_.getText();
   // If this editor has focus, update its selection/cursor position.
   if (document.activeElement === this.el_) {
-    this.el_.setSelectionRange(this.m_.getSelectionRange());
+    var selRange = this.m_.getSelectionRange();
+    this.el_.setSelectionRange(Math.min(selRange[0], selRange[1]),
+                               Math.max(selRange[0], selRange[1]))
   }
 };
 

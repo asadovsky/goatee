@@ -1,10 +1,8 @@
 // See also: https://developers.google.com/drive/realtime/
 //
 // TODO:
-//  - Change model event handlers to take event objects
-//  - Expand event objects to include sessionId, type, and other fields
-//  - Support >1 Document or Model
-//  - Add mechanism to track cursor positions and other ranges (e.g. bold)
+//  - Track selection ranges in server
+//  - Support other ranges (e.g. bold)
 //  - Maybe add canUndo and canRedo properties
 //  - Check for race conditions
 
@@ -173,13 +171,11 @@ goatee.ot.Model.prototype.deleteText = function(pos, len) {
 };
 
 goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
-  // TODO: Push op to server. For now, we manually notify listeners.
+  // TODO: Push op to server. For now, we simply update local state and notify
+  // listeners.
   this.selStart_ = start;
   this.selEnd_ = end;
-  var arr = this.listeners_[goatee.EventType.SET_SELECTION_RANGE];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](start, end, true);
-  }
+  this.broadcastEvent_(new goatee.SetSelectionRangeEvent(true, start, end));
 };
 
 goatee.ot.Model.prototype.addEventListener = function(type, handler) {
@@ -213,10 +209,7 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
       if (this.selStart_ >= op.pos) this.selStart_ += op.value.length;
       if (this.selEnd_ >= op.pos) this.selEnd_ += op.value.length;
     }
-    var arr = this.listeners_[goatee.EventType.INSERT_TEXT];
-    for (var i = 0; i < arr.length; i++) {
-      arr[i](op.pos, op.value, isLocal);
-    }
+    this.broadcastEvent_(new goatee.InsertTextEvent(isLocal, op.pos, op.value));
     break;
   case 'Delete':
     console.assert(op.pos + op.len <= t.length, 'Delete past end');
@@ -233,10 +226,7 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
         this.selEnd_ = Math.max(op.pos, this.selEnd_ - op.len);
       }
     }
-    var arr = this.listeners_[goatee.EventType.DELETE_TEXT];
-    for (var i = 0; i < arr.length; i++) {
-      arr[i](op.pos, op.len, isLocal);
-    }
+    this.broadcastEvent_(new goatee.DeleteTextEvent(isLocal, op.pos, op.len));
     break;
   default:
     console.assert(false, 'Unexpected operation type "' + op.typeName() + '"');
@@ -246,5 +236,12 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
 goatee.ot.Model.prototype.applyCompound_ = function(ops, isLocal) {
   for (var i = 0; i < ops.length; i++) {
     this.apply_(ops[i], isLocal);
+  }
+};
+
+goatee.ot.Model.prototype.broadcastEvent_ = function(e) {
+  var arr = this.listeners_[e.type];
+  for (var i = 0; i < arr.length; i++) {
+    arr[i](e);
   }
 };
