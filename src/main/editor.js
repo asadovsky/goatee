@@ -63,9 +63,9 @@ goatee.ed.Model_ = function() {
   this.selEnd_ = 0;
 
   this.listeners_ = {};
-  this.listeners_[goatee.EventType.TEXT_INSERT] = [];
-  this.listeners_[goatee.EventType.TEXT_DELETE] = [];
-  this.listeners_[goatee.EventType.SET_SELECTION] = [];
+  this.listeners_[goatee.EventType.INSERT_TEXT] = [];
+  this.listeners_[goatee.EventType.DELETE_TEXT] = [];
+  this.listeners_[goatee.EventType.SET_SELECTION_RANGE] = [];
 };
 
 goatee.ed.Model_.prototype.getText = function() {
@@ -81,7 +81,7 @@ goatee.ed.Model_.prototype.insertText = function(pos, value) {
   this.selStart_ = pos + value.length;
   this.selEnd_ = this.selStart_;
 
-  var arr = this.listeners_[goatee.EventType.TEXT_INSERT];
+  var arr = this.listeners_[goatee.EventType.INSERT_TEXT];
   for (var i = 0; i < arr.length; i++) {
     arr[i](pos, value, true);
   }
@@ -92,7 +92,7 @@ goatee.ed.Model_.prototype.deleteText = function(pos, len) {
   this.selStart_ = pos;
   this.selEnd_ = this.selStart_;
 
-  var arr = this.listeners_[goatee.EventType.TEXT_DELETE];
+  var arr = this.listeners_[goatee.EventType.DELETE_TEXT];
   for (var i = 0; i < arr.length; i++) {
     arr[i](pos, len, true);
   }
@@ -102,7 +102,7 @@ goatee.ed.Model_.prototype.setSelectionRange = function(start, end) {
   this.selStart_ = start;
   this.selEnd_ = end;
 
-  var arr = this.listeners_[goatee.EventType.SET_SELECTION];
+  var arr = this.listeners_[goatee.EventType.SET_SELECTION_RANGE];
   for (var i = 0; i < arr.length; i++) {
     arr[i](start, end, true);
   }
@@ -197,11 +197,12 @@ goatee.ed.Editor.prototype.reset = function(model) {
 
   // Register model event handlers.
   this.m_.addEventListener(
-    goatee.EventType.TEXT_INSERT, this.handleInsertText_.bind(this));
+    goatee.EventType.INSERT_TEXT, this.handleInsertText_.bind(this));
   this.m_.addEventListener(
-    goatee.EventType.TEXT_DELETE, this.handleDeleteText_.bind(this));
+    goatee.EventType.DELETE_TEXT, this.handleDeleteText_.bind(this));
   this.m_.addEventListener(
-    goatee.EventType.SET_SELECTION, this.handleSetSelectionRange_.bind(this));
+    goatee.EventType.SET_SELECTION_RANGE,
+    this.handleSetSelectionRange_.bind(this));
 
   // Reset internal state.
   this.hasFocus_ = false;

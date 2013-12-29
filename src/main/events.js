@@ -5,7 +5,7 @@
 var goatee = goatee || {};
 
 goatee.EventType = {
-  TEXT_INSERT: 'text_insert',
-  TEXT_DELETE: 'text_delete',
-  SET_SELECTION: 'set_selection'
+  INSERT_TEXT: 'insert_text',
+  DELETE_TEXT: 'delete_text',
+  SET_SELECTION_RANGE: 'set_selection_range'
 };

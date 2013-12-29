@@ -38,8 +38,8 @@ goatee.ta.TextAreaEditor.prototype.reset = function(model) {
   if (model) {
     // Register model event handlers.
     var handler = this.handleModifyText_.bind(this);
-    this.m_.addEventListener(goatee.EventType.TEXT_INSERT, handler);
-    this.m_.addEventListener(goatee.EventType.TEXT_DELETE, handler);
+    this.m_.addEventListener(goatee.EventType.INSERT_TEXT, handler);
+    this.m_.addEventListener(goatee.EventType.DELETE_TEXT, handler);
 
     this.el_.value = this.m_.getText();
   }
@@ -48,7 +48,7 @@ goatee.ta.TextAreaEditor.prototype.reset = function(model) {
 ////////////////////////////////////////////////////////////////////////////////
 // Model event handlers
 
-// Handles both TEXT_INSERT and TEXT_DELETE.
+// Handles both INSERT_TEXT and DELETE_TEXT.
 goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(
   x, y, isLocal) {
   if (isLocal) return;

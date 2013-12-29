@@ -151,9 +151,9 @@ goatee.ot.Model = function(doc, text) {
   this.selEnd_ = 0;
 
   this.listeners_ = {};
-  this.listeners_[goatee.EventType.TEXT_INSERT] = [];
-  this.listeners_[goatee.EventType.TEXT_DELETE] = [];
-  this.listeners_[goatee.EventType.SET_SELECTION] = [];
+  this.listeners_[goatee.EventType.INSERT_TEXT] = [];
+  this.listeners_[goatee.EventType.DELETE_TEXT] = [];
+  this.listeners_[goatee.EventType.SET_SELECTION_RANGE] = [];
 };
 
 goatee.ot.Model.prototype.getText = function() {
@@ -176,7 +176,7 @@ goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
   // TODO: Push op to server. For now, we manually notify listeners.
   this.selStart_ = start;
   this.selEnd_ = end;
-  var arr = this.listeners_[goatee.EventType.SET_SELECTION];
+  var arr = this.listeners_[goatee.EventType.SET_SELECTION_RANGE];
   for (var i = 0; i < arr.length; i++) {
     arr[i](start, end, true);
   }
@@ -213,7 +213,7 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
       if (this.selStart_ >= op.pos) this.selStart_ += op.value.length;
       if (this.selEnd_ >= op.pos) this.selEnd_ += op.value.length;
     }
-    var arr = this.listeners_[goatee.EventType.TEXT_INSERT];
+    var arr = this.listeners_[goatee.EventType.INSERT_TEXT];
     for (var i = 0; i < arr.length; i++) {
       arr[i](op.pos, op.value, isLocal);
     }
@@ -233,7 +233,7 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
         this.selEnd_ = Math.max(op.pos, this.selEnd_ - op.len);
       }
     }
-    var arr = this.listeners_[goatee.EventType.TEXT_DELETE];
+    var arr = this.listeners_[goatee.EventType.DELETE_TEXT];
     for (var i = 0; i < arr.length; i++) {
       arr[i](op.pos, op.len, isLocal);
     }
