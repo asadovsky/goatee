@@ -16,8 +16,7 @@
 //  - Play with React (http://facebook.github.io/react/)
 //
 // OT-specific TODO:
-//  - Change model event handlers to take event objects
-//  - Show all cursors and selections
+//  - Show other users' selections/cursors
 //  - Smarter handling of cursor_.prevLeft on non-local text mutations
 
 'use strict';
@@ -338,7 +337,6 @@ goatee.ed.Editor.prototype.getCursorPos_ = function() {
 
 // Updates state given p (offset), then renders selection.
 goatee.ed.Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
-  // TODO: If nothing has changed, don't update model or render.
   this.cursor_.prevLeft = null;
   this.cursor_.append = false;
 
@@ -369,7 +367,6 @@ goatee.ed.Editor.prototype.setSelectionFromRowAndX_ = function(
     left = newLeft;
   }
 
-  // TODO: If nothing has changed, don't update model or render.
   if (clearPrevLeft) this.cursor_.prevLeft = null;
   // If the character at position p is actually on the next line, switch cursor
   // state to "append" mode.

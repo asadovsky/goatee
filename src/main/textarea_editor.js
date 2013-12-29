@@ -1,8 +1,7 @@
 // Defines TextAreaEditor class.
 //
 // TODO:
-//  - Notify model of changes to selection range
-//  - Catch undo/redo, maybe using 'input' event
+//  - Disallow non-ASCII characters
 //  - Check for race conditions
 
 'use strict';
@@ -16,6 +15,7 @@ goatee.ta = goatee.ta || {};
 goatee.ta.Model_ = function() {
   this.insertText = function(pos, value) {};
   this.deleteText = function(pos, len) {};
+  this.setSelectionRange = function(start, end) {};
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -25,12 +25,16 @@ goatee.ta.TextAreaEditor = function(editorEl, model) {
   this.el_ = editorEl;
   this.reset(model);
 
-  // Register input handlers. Use keypress to catch char insertions, keydown to
-  // catch backspace/delete. Also catch cut and paste.
-  this.el_.addEventListener('keypress', this.handleKeyPress_.bind(this));
-  this.el_.addEventListener('keydown', this.handleKeyDown_.bind(this));
-  this.el_.addEventListener('cut', this.handleCut_.bind(this));
-  this.el_.addEventListener('paste', this.handlePaste_.bind(this));
+  // Register input handlers. Use 'input' event to catch text mutations, and
+  // various other events to catch selection mutations.
+  this.el_.addEventListener('input', this.handleInput_.bind(this));
+
+  var handler = this.updateSelection_.bind(this);
+  this.el_.addEventListener('input', handler);
+  this.el_.addEventListener('keydown', handler);
+  this.el_.addEventListener('mousedown', handler);
+  this.el_.addEventListener('mousemove', handler);
+  this.el_.addEventListener('select', handler);
 };
 
 goatee.ta.TextAreaEditor.prototype.reset = function(model) {
@@ -64,58 +68,28 @@ goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(e) {
 ////////////////////////////////////////////////////////////////////////////////
 // Input handlers
 
-goatee.ta.TextAreaEditor.prototype.handleKeyDown_ = function(e) {
-  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
-  switch (e.which) {
-  case 8:  // backspace
-    // Handles ctrl+backspace.
-    window.setTimeout((function() {
-      var newSelStart = this.el_.selectionStart;
-      var len = selEnd - newSelStart;
-      if (len > 0) {
-        this.m_.deleteText(newSelStart, len);
-      }
-    }).bind(this), 0);
-    break;
-  case 46:  // delete
-    // Handles ctrl+delete.
-    var size = this.el_.value.length;
-    window.setTimeout((function() {
-      var newSize = this.el_.value.length;
-      var len = size - newSize;
-      if (len > 0) {
-        this.m_.deleteText(selStart, len);
-      }
-    }).bind(this), 0);
-    break;
-  }
+goatee.ta.TextAreaEditor.prototype.handleInput_ = function(e) {
+  // Note, oldText can equal newText, e.g. if user selects all, then copies,
+  // then pastes.
+  var oldText = this.m_.getText(), newText = this.el_.value;
+
+  var minLen = Math.min(oldText.length, newText.length);
+  var l = 0, r = 0;
+  while (l < minLen && oldText.charAt(l) === newText.charAt(l)) l++;
+  while (l + r < minLen && (oldText.charAt(oldText.length - 1 - r) ===
+                            newText.charAt(newText.length - 1 - r))) r++;
+
+  var insertLen = newText.length - r - l;
+  var deleteLen = oldText.length - r - l;
+  console.assert(insertLen >= 0, insertLen);
+  console.assert(deleteLen >= 0, deleteLen);
+
+  if (insertLen > 0) this.m_.insertText(l, newText.substr(l, insertLen));
+  if (deleteLen > 0) this.m_.deleteText(l, deleteLen);
 };
 
-goatee.ta.TextAreaEditor.prototype.handleKeyPress_ = function(e) {
-  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
-  // If there was a prior selection, log the deletion.
-  if (selStart < selEnd) {
-    this.m_.deleteText(selStart, selEnd - selStart);
-  }
-  this.m_.insertText(selStart, String.fromCharCode(event.which));
-};
-
-goatee.ta.TextAreaEditor.prototype.handleCut_ = function(e) {
-  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
-  if (selStart < selEnd) {
-    this.m_.deleteText(selStart, selEnd - selStart);
-  }
-};
-
-goatee.ta.TextAreaEditor.prototype.handlePaste_ = function(e) {
-  var selStart = this.el_.selectionStart, selEnd = this.el_.selectionEnd;
-  // If there was a prior selection, log the deletion.
-  if (selStart < selEnd) {
-    this.m_.deleteText(selStart, selEnd - selStart);
-  }
-  // Get the pasted content.
+goatee.ta.TextAreaEditor.prototype.updateSelection_ = function() {
   window.setTimeout((function() {
-    var newSelStart = this.el_.selectionStart;
-    this.m_.insertText(selStart, this.el_.value.substr(selStart, newSelStart));
+    this.m_.setSelectionRange(this.el_.selectionStart, this.el_.selectionEnd);
   }).bind(this), 0);
 };

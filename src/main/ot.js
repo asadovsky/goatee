@@ -1,3 +1,5 @@
+// Client-side OT.
+//
 // See also: https://developers.google.com/drive/realtime/
 //
 // TODO:
@@ -129,9 +131,9 @@ goatee.ot.Document.prototype.pushOp_ = function(op) {
   // If op is parented off server state space (as opposed to some non-acked
   // client op), send it right away.
   if (clientOpIdx === this.ackedClientOpIdx_ + 1) {
-    // Use setTimeout(x, 0) to avoid blocking the client, and to ensure that
-    // combo ops (e.g. delete selection + insert replacement text) are packaged
-    // together.
+    // Use setTimeout(x, 0) to avoid blocking the client.
+    // TODO: Make it so that combo ops (e.g. delete selection + insert
+    // replacement text) are sent to the server together.
     window.setTimeout(this.sendBufferedOps_.bind(this), 0);
   }
 };
@@ -163,14 +165,17 @@ goatee.ot.Model.prototype.getSelectionRange = function() {
 };
 
 goatee.ot.Model.prototype.insertText = function(pos, value) {
+  if (value.length === 0) return;
   this.doc_.pushOp_(new goatee.ot.Insert(pos, value));
 };
 
 goatee.ot.Model.prototype.deleteText = function(pos, len) {
+  if (len === 0) return;
   this.doc_.pushOp_(new goatee.ot.Delete(pos, len));
 };
 
 goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
+  if (this.selStart_ === start && this.selEnd_ === end) return;
   // TODO: Push op to server. For now, we simply update local state and notify
   // listeners.
   this.selStart_ = start;

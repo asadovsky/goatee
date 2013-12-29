@@ -28,3 +28,6 @@ git difftool -t opendiff -y HEAD
 git commit -m 'initial commit'
 
 git push -u origin master
+
+# Undo the most recent local commit.
+git reset HEAD^
