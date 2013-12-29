@@ -15,7 +15,7 @@ goatee.ot = goatee.ot || {};
 
 goatee.ot.DEBUG_DELAY = 0;
 goatee.ot.DEBUG_SOCKET = false;
-goatee.ot.DEBUG_EVENTS = true;
+goatee.ot.DEBUG_EVENTS = false;
 
 // Similar to gapi.drive.realtime.load.
 goatee.ot.load = function(docId, onDocLoaded) {
