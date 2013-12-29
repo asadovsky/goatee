@@ -57,7 +57,7 @@ goatee.ta.TextAreaEditor.prototype.handleModifyText_ = function(e) {
   if (document.activeElement === this.el_) {
     var selRange = this.m_.getSelectionRange();
     this.el_.setSelectionRange(Math.min(selRange[0], selRange[1]),
-                               Math.max(selRange[0], selRange[1]))
+                               Math.max(selRange[0], selRange[1]));
   }
 };
 
