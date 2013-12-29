@@ -8,6 +8,7 @@
   </head>
   <body data-ws-url="{{.Socket}}">
     <h1>{{.Name}}</h1>
+
     <div>
       <textarea id="editor1" rows="10" cols="50"></textarea>
       <div>
@@ -23,10 +24,13 @@
         <button id="redo-button" class="display-none" disabled>Redo</button>
       </div>
     </div>
-    <script src="common.js"></script>
+
+    <script src="util.js"></script>
+    <script src="events.js"></script>
+    <script src="textarea_editor.js"></script>
+
     <script src="ot_text.js"></script>
     <script src="ot.js"></script>
-    <script src="textarea_editor.js"></script>
     <script src="textarea_ot.js"></script>
   </body>
 </html>

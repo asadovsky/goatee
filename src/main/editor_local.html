@@ -9,9 +9,13 @@
   </head>
   <body>
     <h1>{{.Name}}</h1>
+
     <div id="editor"></div>
-    <script src="common.js"></script>
+
+    <script src="util.js"></script>
+    <script src="events.js"></script>
     <script src="editor.js"></script>
+
     <script>
       var editorEl = document.querySelector('#editor');
       var editor = new goatee.ed.Editor(editorEl);

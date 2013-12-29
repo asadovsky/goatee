@@ -9,13 +9,17 @@
   </head>
   <body data-ws-url="{{.Socket}}">
     <h1>{{.Name}}</h1>
+
     <div id="editor1"></div>
     <br>
     <div id="editor2"></div>
-    <script src="common.js"></script>
+
+    <script src="util.js"></script>
+    <script src="events.js"></script>
+    <script src="editor.js"></script>
+
     <script src="ot_text.js"></script>
     <script src="ot.js"></script>
-    <script src="editor.js"></script>
     <script src="editor_ot.js"></script>
   </body>
 </html>
