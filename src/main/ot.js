@@ -4,6 +4,7 @@
 //
 // TODO:
 //  - Track selection ranges in server
+//  - Use browser native custom events
 //  - Support other ranges (e.g. bold)
 //  - Maybe add canUndo and canRedo properties
 //  - Check for race conditions

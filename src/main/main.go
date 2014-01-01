@@ -204,6 +204,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		}{
 			name,
 			template.URL(fmt.Sprintf("ws://%s/ws", listenAddr)),
+			//template.URL("ws://192.168.1.239:4000/ws"),
 		}
 		util.PanicOnError(tmpl.ExecuteTemplate(w, name, data))
 	} else {

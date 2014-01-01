@@ -90,6 +90,9 @@ goatee.ta.TextAreaEditor.prototype.handleInput_ = function(e) {
 };
 
 goatee.ta.TextAreaEditor.prototype.updateSelection_ = function() {
+  // TODO: Potential race condition. User A hits the right arrow key, triggering
+  // updateSelection_ (via keydown), but then user B inserts 'x' before the
+  // timeout below triggers.
   window.setTimeout((function() {
     // TODO: Do we need to canonicalize line breaks first, to avoid having \r\n
     // count as two chars?
