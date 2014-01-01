@@ -197,7 +197,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", ctype)
 
 	if strings.HasSuffix(name, "html") {
-		tmpl := template.Must(template.ParseGlob("*.html"))
+		tmpl := template.Must(template.ParseGlob("demo/*.html"))
 		data := struct {
 			Name   string
 			Socket template.URL
@@ -206,7 +206,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 			template.URL(fmt.Sprintf("ws://%s/ws", listenAddr)),
 			//template.URL("ws://192.168.1.239:4000/ws"),
 		}
-		util.PanicOnError(tmpl.ExecuteTemplate(w, name, data))
+		util.PanicOnError(tmpl.ExecuteTemplate(w, filepath.Base(name), data))
 	} else {
 		b, err := ioutil.ReadFile(name)
 		util.PanicOnError(err)

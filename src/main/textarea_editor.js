@@ -10,15 +10,6 @@ var goatee = goatee || {};
 goatee.ta = goatee.ta || {};
 
 ////////////////////////////////////////////////////////////////////////////////
-// Model_
-
-goatee.ta.Model_ = function() {
-  this.insertText = function(pos, value) {};
-  this.deleteText = function(pos, len) {};
-  this.setSelectionRange = function(start, end) {};
-};
-
-////////////////////////////////////////////////////////////////////////////////
 // TextAreaEditor
 
 goatee.ta.TextAreaEditor = function(editorEl, model) {
@@ -38,16 +29,15 @@ goatee.ta.TextAreaEditor = function(editorEl, model) {
 };
 
 goatee.ta.TextAreaEditor.prototype.reset = function(model) {
-  this.m_ = model || new goatee.ta.Model_();
+  this.m_ = model;
 
-  if (model) {
-    // Register model event handlers.
-    var handler = this.handleModifyText_.bind(this);
-    this.m_.addEventListener(goatee.EventType.INSERT_TEXT, handler);
-    this.m_.addEventListener(goatee.EventType.DELETE_TEXT, handler);
+  // Register model event handlers.
+  var handler = this.handleModifyText_.bind(this);
+  this.m_.addEventListener(goatee.EventType.INSERT_TEXT, handler);
+  this.m_.addEventListener(goatee.EventType.DELETE_TEXT, handler);
 
-    this.el_.value = this.m_.getText();
-  }
+  // Handle non-empty initial model state.
+  this.el_.value = this.m_.getText();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
