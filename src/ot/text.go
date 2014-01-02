@@ -1,4 +1,4 @@
-// Package ot implements Opal Transformation.
+// Package ot implements Operational Transformation.
 package ot
 
 import (

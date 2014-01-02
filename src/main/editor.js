@@ -79,20 +79,20 @@ goatee.ed.Model_.prototype.insertText = function(pos, value) {
   this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos);
   this.selStart_ = pos + value.length;
   this.selEnd_ = this.selStart_;
-  this.broadcastEvent_(new goatee.InsertTextEvent(true, pos, value));
+  this.dispatchEvent_(new goatee.InsertTextEvent(true, pos, value));
 };
 
 goatee.ed.Model_.prototype.deleteText = function(pos, len) {
   this.text_ = this.text_.substr(0, pos) + this.text_.substr(pos + len);
   this.selStart_ = pos;
   this.selEnd_ = this.selStart_;
-  this.broadcastEvent_(new goatee.DeleteTextEvent(true, pos, len));
+  this.dispatchEvent_(new goatee.DeleteTextEvent(true, pos, len));
 };
 
 goatee.ed.Model_.prototype.setSelectionRange = function(start, end) {
   this.selStart_ = start;
   this.selEnd_ = end;
-  this.broadcastEvent_(new goatee.SetSelectionRangeEvent(true, start, end));
+  this.dispatchEvent_(new goatee.SetSelectionRangeEvent(true, start, end));
 };
 
 goatee.ed.Model_.prototype.addEventListener = function(type, handler) {
@@ -103,7 +103,7 @@ goatee.ed.Model_.prototype.removeEventListener = function(type, handler) {
   goatee.removeFromArray(handler, this.listeners_[type]);
 };
 
-goatee.ed.Model_.prototype.broadcastEvent_ = function(e) {
+goatee.ed.Model_.prototype.dispatchEvent_ = function(e) {
   var arr = this.listeners_[e.type];
   for (var i = 0; i < arr.length; i++) {
     arr[i](e);

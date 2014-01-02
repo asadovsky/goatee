@@ -4,9 +4,9 @@
 //
 // TODO:
 //  - Track selection ranges in server
-//  - Use browser native custom events
 //  - Support other ranges (e.g. bold)
-//  - Maybe add canUndo and canRedo properties
+//  - Support undo/redo
+//  - Maybe add canUndo/canRedo properties
 //  - Check for race conditions
 
 'use strict';
@@ -183,7 +183,7 @@ goatee.ot.Model.prototype.setSelectionRange = function(start, end) {
   // listeners.
   this.selStart_ = start;
   this.selEnd_ = end;
-  this.broadcastEvent_(new goatee.SetSelectionRangeEvent(true, start, end));
+  this.dispatchEvent_(new goatee.SetSelectionRangeEvent(true, start, end));
 };
 
 goatee.ot.Model.prototype.addEventListener = function(type, handler) {
@@ -217,7 +217,7 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
       if (this.selStart_ >= op.pos) this.selStart_ += op.value.length;
       if (this.selEnd_ >= op.pos) this.selEnd_ += op.value.length;
     }
-    this.broadcastEvent_(new goatee.InsertTextEvent(isLocal, op.pos, op.value));
+    this.dispatchEvent_(new goatee.InsertTextEvent(isLocal, op.pos, op.value));
     break;
   case 'Delete':
     console.assert(op.pos + op.len <= t.length, 'Delete past end');
@@ -234,7 +234,7 @@ goatee.ot.Model.prototype.apply_ = function(op, isLocal) {
         this.selEnd_ = Math.max(op.pos, this.selEnd_ - op.len);
       }
     }
-    this.broadcastEvent_(new goatee.DeleteTextEvent(isLocal, op.pos, op.len));
+    this.dispatchEvent_(new goatee.DeleteTextEvent(isLocal, op.pos, op.len));
     break;
   default:
     console.assert(false, 'Unexpected operation type "' + op.typeName() + '"');
@@ -247,7 +247,7 @@ goatee.ot.Model.prototype.applyCompound_ = function(ops, isLocal) {
   }
 };
 
-goatee.ot.Model.prototype.broadcastEvent_ = function(e) {
+goatee.ot.Model.prototype.dispatchEvent_ = function(e) {
   if (goatee.ot.DEBUG_EVENTS) console.log(e);
   var arr = this.listeners_[e.type];
   for (var i = 0; i < arr.length; i++) {

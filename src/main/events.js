@@ -1,4 +1,6 @@
 // Model event types and objects.
+//
+// See also: https://developers.google.com/drive/realtime/handle-events
 
 'use strict';
 
@@ -11,7 +13,7 @@ goatee.EventType = {
 };
 
 // Similar to gapi.drive.realtime.BaseModelEvent.
-// TODO: Expand to include target, sessionId, and other fields.
+// TODO: Expand to include bubbles, sessionId, and userId.
 goatee.BaseModelEvent = function(type, isLocal) {
   this.type = type;
   this.isLocal = isLocal;
