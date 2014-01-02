@@ -5,6 +5,7 @@
 //
 // TODO:
 //  - Mouse tests
+//  - Verify that everything still works with 20px border
 //  - Add tests where we apply the same operations in textarea and editor, then
 //    compare state
 //  - Add tests for rendering, perhaps using

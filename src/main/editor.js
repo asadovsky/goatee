@@ -153,20 +153,9 @@ goatee.ed.Cursor_.prototype.hide = function() {
 // Here, bottom means "distance from top of editor to bottom of cursor".
 goatee.ed.Cursor_.prototype.move = function(left, bottom, height) {
   if (goatee.ed.DEBUG) console.log(left, bottom, height);
-
   this.el_.style.left = left + 'px';
   this.el_.style.top = bottom - height + 'px';
   this.el_.style.height = height + 'px';
-
-  // If the cursor is not in the window, scroll the window.
-  var wTop = window.pageYOffset, wBottom = wTop + window.innerHeight;
-  var cRect = this.el_.getBoundingClientRect();
-  var cTop = wTop + cRect.top, cBottom = wTop + cRect.bottom;
-  if (cTop < wTop + 10) {
-    window.scrollBy(0, -(wTop - cTop + 100));
-  } else if (cBottom > wBottom - 10) {
-    window.scrollBy(0, cBottom - wBottom + 100);
-  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -223,12 +212,16 @@ goatee.ed.Editor.prototype.reset = function(model) {
   this.hs_ = new goatee.ed.HtmlSizer_(this.el_);
 
   // Set fields that depend on DOM.
+  this.borderWidth_ = parseInt(window.getComputedStyle(
+    this.el_, null).getPropertyValue('border-top-width'), 10);
+  this.width_ = parseInt(window.getComputedStyle(
+    this.el_, null).getPropertyValue('width'), 10);
   this.innerWidth_ = parseInt(window.getComputedStyle(
     this.innerEl_, null).getPropertyValue('width'), 10);
 
   // Initialize charSizes_ to handle non-empty initial model state.
   this.initCharSizes_();
-  this.renderAll_();
+  this.renderAll_(true);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -236,7 +229,12 @@ goatee.ed.Editor.prototype.reset = function(model) {
 
 goatee.ed.Editor.prototype.focus = function() {
   this.hasFocus_ = true;
-  this.renderSelection_();
+  this.renderSelection_(false);
+};
+
+goatee.ed.Editor.prototype.blur = function() {
+  this.hasFocus_ = false;
+  this.renderSelection_(false);
 };
 
 goatee.ed.Editor.prototype.getText = function() {
@@ -258,18 +256,17 @@ goatee.ed.Editor.prototype.handleInsertText_ = function(e) {
   }
   this.charSizes_ = this.charSizes_.slice(0, e.pos).concat(
     valueCharSizes, this.charSizes_.slice(e.pos));
-
-  this.renderAll_();
+  this.renderAll_(e.isLocal);
 };
 
 goatee.ed.Editor.prototype.handleDeleteText_ = function(e) {
   this.charSizes_.splice(e.pos, e.len);
-  this.renderAll_();
+  this.renderAll_(e.isLocal);
 };
 
 goatee.ed.Editor.prototype.handleSetSelectionRange_ = function(e) {
-  if (!e.isLocal) return;
-  this.renderSelection_();
+  console.assert(e.isLocal);
+  this.renderSelection_(true);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -450,7 +447,7 @@ goatee.ed.Editor.prototype.computeCursorRowAndLeft_ = function() {
   return [row, left];
 };
 
-goatee.ed.Editor.prototype.renderSelection_ = function() {
+goatee.ed.Editor.prototype.renderSelection_ = function(updateScroll) {
   var els = this.textEl_.querySelectorAll('.highlight');
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
@@ -464,6 +461,30 @@ goatee.ed.Editor.prototype.renderSelection_ = function() {
   var tup = this.lineYOffsets_[row], top = tup[0], bottom = tup[1];
   this.cursor_.move(left, bottom, bottom - top);
 
+  if (updateScroll) {
+    // If the cursor is not visible within the editor, scroll the editor.
+    var rect = this.el_.getBoundingClientRect();
+    var cursorRect = this.cursor_.el_.getBoundingClientRect();
+    var BW = this.borderWidth_, SLACK = 10, BONUS = 20;
+    if (cursorRect.top - SLACK < rect.top + BW) {
+      this.el_.scrollTop += (
+        (cursorRect.top - SLACK) - (rect.top + BW) - BONUS);
+    } else if (cursorRect.bottom + SLACK > rect.bottom - BW) {
+      this.el_.scrollTop += (
+        (cursorRect.bottom + SLACK) - (rect.bottom - BW) + BONUS);
+    }
+    // Same as above, but s/editor/window/. Useful if using "min-height" rather
+    // than "height" for this.el_.
+    if (cursorRect.top - SLACK < 0) {
+      window.scrollBy(
+        0, (cursorRect.top - SLACK) - BONUS);
+    } else if (cursorRect.bottom + SLACK > window.innerHeight) {
+      window.scrollBy(
+        0, (cursorRect.bottom + SLACK) - window.innerHeight + BONUS);
+    }
+  }
+
+  // Display the selection or cursor.
   var sel = this.getSelectionOrNull_();
   if (sel === null) {
     if (this.hasFocus_) {
@@ -512,7 +533,7 @@ goatee.ed.Editor.prototype.renderSelection_ = function() {
 //  - Build html and array of line p-offsets, based on char widths
 //  - Build array of line y-offsets
 //  - Process arrays to place selection/cursor
-goatee.ed.Editor.prototype.renderAll_ = function() {
+goatee.ed.Editor.prototype.renderAll_ = function(updateScroll) {
   var text = this.m_.getText();
   console.assert(this.charSizes_.length === text.length);
 
@@ -538,6 +559,8 @@ goatee.ed.Editor.prototype.renderAll_ = function() {
     } else {
       lineWidth += this.charSizes_[p][0];
       if (c === ' ') lineLastSpace = p - lineBegin;
+      // NOTE: Supporting an "on-demand" native scroll bar would be tricky. For
+      // now, we make the scroll bar "always-on".
       if (lineWidth <= this.innerWidth_) {
         p++;
         continue;
@@ -585,7 +608,7 @@ goatee.ed.Editor.prototype.renderAll_ = function() {
   }
 
   // Assumes linePOffsets_, lineYOffsets_, and charSizes_ are up-to-date.
-  this.renderSelection_();
+  this.renderSelection_(updateScroll);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -645,10 +668,10 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
 
   switch (e.which) {
   case 35:  // end
-    // Note, we use setSelectionFromRowAndX_ because we want to place the
-    // cursor at EOL.
+    // Note, we use setSelectionFromRowAndX_ because we want to place the cursor
+    // at EOL.
     this.setSelectionFromRowAndX_(
-      this.cursor_.row, this.innerWidth_, !e.shiftKey, true);
+      this.cursor_.row, this.width_, !e.shiftKey, true);
     break;
   case 36:  // home
     this.setSelectionFromP_(
@@ -674,7 +697,6 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
       }
       this.setSelectionFromRowAndX_(
         this.cursor_.row - 1, this.cursor_.prevLeft, !e.shiftKey, false);
-      this.renderSelection_();
     }
     break;
   case 39:  // right arrow
@@ -724,47 +746,54 @@ goatee.ed.Editor.prototype.handleKeyDown_ = function(e) {
 };
 
 goatee.ed.Editor.prototype.handleMouseDown_ = function(e) {
-  var viewportX = e.pageX - window.pageXOffset;
-  var viewportY = e.pageY - window.pageYOffset;
-
   var rect = this.el_.getBoundingClientRect();
-  if (viewportX < rect.left || viewportX > rect.right ||
-      viewportY < rect.top || viewportY > rect.bottom) {
+  var BW = this.borderWidth_;
+  if (e.clientX < rect.left + BW || e.clientX > rect.right - BW ||
+      e.clientY < rect.top + BW || e.clientY > rect.bottom - BW) {
     this.hasFocus_ = false;
-    this.renderSelection_();
+    this.mouseIsDown_ = false;
+    this.renderSelection_(false);
     return;
   }
-  this.hasFocus_ = true;
-  this.mouseIsDown_ = true;
   e.preventDefault();
 
   var innerRect = this.innerEl_.getBoundingClientRect();
-  var x = viewportX - innerRect.left;
-  var y = viewportY - innerRect.top;
+
+  // If the click's X position was outside innerRect, the click must have been
+  // on el_'s scroll bar.
+  if (e.clientX < innerRect.left || e.clientX > innerRect.right) {
+    this.mouseIsDown_ = false;
+    return;
+  }
+
+  this.hasFocus_ = true;
+  this.mouseIsDown_ = true;
+
+  var x = e.clientX - innerRect.left;
+  var y = e.clientY - innerRect.top;
   this.setSelectionFromRowAndX_(this.rowFromY_(y), x, true, true);
 
   document.addEventListener('mousemove', this.boundHandleMouseMove_);
 };
 
 goatee.ed.Editor.prototype.handleMouseUp_ = function(e) {
-  if (!this.hasFocus_) return;
-  this.mouseIsDown_ = false;
+  if (!this.mouseIsDown_) return;
+  console.assert(this.hasFocus_);
   e.preventDefault();
-  this.renderSelection_();
+
+  this.mouseIsDown_ = false;
+  this.renderSelection_(false);
 
   document.removeEventListener('mousemove', this.boundHandleMouseMove_);
 };
 
 goatee.ed.Editor.prototype.handleMouseMove_ = function(e) {
+  if (!this.mouseIsDown_) return;
   console.assert(this.hasFocus_);
-  console.assert(this.mouseIsDown_);
   e.preventDefault();
 
-  var viewportX = e.pageX - window.pageXOffset;
-  var viewportY = e.pageY - window.pageYOffset;
-
   var innerRect = this.innerEl_.getBoundingClientRect();
-  var x = viewportX - innerRect.left;
-  var y = viewportY - innerRect.top;
+  var x = e.clientX - innerRect.left;
+  var y = e.clientY - innerRect.top;
   this.setSelectionFromRowAndX_(this.rowFromY_(y), x, false, true);
 };
