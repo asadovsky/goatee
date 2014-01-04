@@ -20,9 +20,9 @@ import (
 	"util"
 )
 
-// Current operation encoding is "iP:str" and "dP:len", where "i" means insert,
-// "d" means delete, and "P" is the position (numerical offset) at which the
-// operation was performed.
+// Current operation encoding is "iP:value" and "dP:len", where "i" means
+// insert, "d" means delete, and "P" is the position (integer offset) at which
+// the operation was performed.
 // TODO: Make offset understand utf-8?
 
 // Sent from server to clients.
