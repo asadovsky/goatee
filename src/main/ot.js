@@ -107,10 +107,10 @@ goatee.ot.Document.prototype.sendBufferedOps_ = function() {
   this.sentClientOpIdx_ = this.clientOps_.length - 1;
   // TODO: Compress ops (e.g. combine insertions) before sending.
   var msg = {
-    'OpStrs': goatee.ot.opsToStrings(
+    OpStrs: goatee.ot.opsToStrings(
       this.clientOps_.slice(this.ackedClientOpIdx_ + 1)),
-    'ClientId': this.clientId_,
-    'BaseTxnId': this.baseTxnId_
+    ClientId: this.clientId_,
+    BaseTxnId: this.baseTxnId_
   };
   var send = (function() {
     var json = JSON.stringify(msg);
