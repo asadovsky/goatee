@@ -1,0 +1,4 @@
+.goatee-ed {
+  overflow-y: hidden !important;
+  width: 580px !important;  /* FIXME: Why is this needed? */
+}

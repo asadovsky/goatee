@@ -1,0 +1,19 @@
+{
+  "name": "goatee",
+  "version": "0.0.1",
+  "dependencies": {
+    "inherits": "^2.0.1",
+    "lodash": "^3.10.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^6.1.2",
+    "browserify": "^12.0.1",
+    "cssnano": "^3.3.2",
+    "envify": "^3.4.0",
+    "jshint": "^2.8.0",
+    "postcss-cli": "^2.3.2",
+    "tape": "^4.2.2"
+  },
+  "license": "Apache-2.0",
+  "private": true
+}

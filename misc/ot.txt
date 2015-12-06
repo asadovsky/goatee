@@ -1,5 +1,0 @@
-http://www.codecommit.com/blog/java/understanding-and-applying-operational-transformation
-http://www3.ntu.edu.sg/home/czsun/projects/otfaq/
-
-TODO: Write description of current OT implementation. See previous versions of
-this file for inspiration.

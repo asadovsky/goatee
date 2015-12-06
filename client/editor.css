@@ -1,0 +1,49 @@
+.goatee-ed,
+.goatee-ed *,
+.goatee-ed :before,
+.goatee-ed :after {
+  box-sizing: border-box;
+  -webkit-user-select: none;
+}
+
+.goatee-ed {
+  border: 1px solid #c0c0c0;
+  padding: 8px;
+  width: 600px;
+  height: 200px;
+  background: #fff;
+  font: 400 16px/1 arial, sans-serif;
+  overflow-y: scroll;
+}
+
+.goatee-ed .editor-inner {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  cursor: text;
+}
+
+.goatee-ed .cursor {
+  position: absolute;
+  width: 2px;
+  background-color: #000;
+  border-bottom: 3px solid #fff;
+  z-index: 2;
+}
+
+.goatee-ed .line {
+  position: relative;
+  min-height: 19px;  /* #editor font-size + .cursor border-bottom */
+}
+
+.goatee-ed .line-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.goatee-ed .highlight {
+  position: absolute;
+  top: 0;
+  background-color: #bbdefb;
+  height: 100%;
+}
