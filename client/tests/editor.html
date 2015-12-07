@@ -2,19 +2,10 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <link rel="stylesheet" href="../editor.css">
     <link rel="stylesheet" href="editor.css">
-    <!-- FIXME: Use browserify. -->
-    <script src="../util.js"></script>
-    <script src="../events.js"></script>
-    <script src="../editor.js"></script>
   </head>
   <body>
-    <div id="editor"></div>
-    <script>
-      var editorEl = document.querySelector('#editor');
-      var editor = new goatee.ed.Editor(editorEl);
-    </script>
-    <script src="editor.js"></script>
+    <div id="ed"></div>
+    <script src="editor.min.js"></script>
   </body>
 </html>

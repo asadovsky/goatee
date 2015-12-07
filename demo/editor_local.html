@@ -10,16 +10,13 @@
   <body>
     <h1>{{.Name}}</h1>
 
-    <div id="editor"></div>
+    <div id="ed"></div>
 
-    <!-- FIXME: Use browserify. -->
+    <!-- TODO: Use browserify. -->
     <script src="../util.js"></script>
     <script src="../events.js"></script>
     <script src="../editor.js"></script>
 
-    <script>
-      var editorEl = document.querySelector('#editor');
-      var editor = new goatee.ed.Editor(editorEl);
-    </script>
+    <script src="editor_local.js"></script>
   </body>
 </html>

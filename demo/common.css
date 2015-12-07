@@ -12,10 +12,6 @@ body {
   background: #f0f0f0;
 }
 
-.display-none {
-  display: none;
-}
-
 textarea {
   display: block;
   margin: 0;

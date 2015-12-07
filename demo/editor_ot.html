@@ -3,18 +3,18 @@
   <head>
     <meta charset="utf-8">
     <title>{{.Name}}</title>
-    <link rel="stylesheet" href="../editor.css">
+    <link rel="stylesheet" href="../client/editor.css">
     <link rel="stylesheet" href="common.css">
     <link rel="icon" href="http://www.google.com/favicon.ico">
   </head>
   <body data-ws-url="{{.Socket}}">
     <h1>{{.Name}}</h1>
 
-    <div id="editor1"></div>
+    <div id="ed1"></div>
     <br>
-    <div id="editor2"></div>
+    <div id="ed2"></div>
 
-    <!-- FIXME: Use browserify. -->
+    <!-- TODO: Use browserify. -->
     <script src="../util.js"></script>
     <script src="../events.js"></script>
     <script src="../editor.js"></script>

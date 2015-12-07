@@ -13,7 +13,7 @@ var EventType = {
 };
 
 // Similar to gapi.drive.realtime.BaseModelEvent.
-// TODO: Expand to include bubbles, sessionId, and userId.
+// TODO: Add sessionId and userId.
 function BaseModelEvent(type, isLocal) {
   this.type = type;
   this.isLocal = isLocal;
@@ -21,7 +21,7 @@ function BaseModelEvent(type, isLocal) {
 
 // Similar to gapi.drive.realtime.TextInsertedEvent.
 function InsertTextEvent(isLocal, pos, value) {
-  BaseModelEvent.call(EventType.INSERT_TEXT, isLocal);
+  BaseModelEvent.call(this, EventType.INSERT_TEXT, isLocal);
   this.pos = pos;
   this.value = value;
 }
@@ -29,14 +29,14 @@ inherits(InsertTextEvent, BaseModelEvent);
 
 // Similar to gapi.drive.realtime.TextDeletedEvent.
 function DeleteTextEvent(isLocal, pos, len) {
-  BaseModelEvent.call(EventType.DELETE_TEXT, isLocal);
+  BaseModelEvent.call(this, EventType.DELETE_TEXT, isLocal);
   this.pos = pos;
   this.len = len;
 }
 inherits(DeleteTextEvent, BaseModelEvent);
 
 function SetSelectionRangeEvent(isLocal, start, end) {
-  BaseModelEvent.call(EventType.SET_SELECTION_RANGE, isLocal);
+  BaseModelEvent.call(this, EventType.SET_SELECTION_RANGE, isLocal);
   this.start = start;
   this.end = end;
 }

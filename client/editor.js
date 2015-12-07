@@ -23,6 +23,7 @@
 'use strict';
 
 var events = require('./events');
+var HtmlSizer = require('./html_sizer');
 var util = require('./util');
 
 module.exports = Editor;
@@ -30,36 +31,9 @@ module.exports = Editor;
 var DEBUG = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
-// HtmlSizer_
+// Model
 
-function HtmlSizer_(parentEl) {
-  this.el_ = document.createElement('div');
-  this.el_.style.position = 'fixed';
-  this.el_.style.top = '-1000px';
-  this.el_.style.left = '-1000px';
-  this.el_.style.visibilty = 'hidden';
-  parentEl.appendChild(this.el_);
-}
-
-HtmlSizer_.prototype.size = function(html) {
-  this.el_.innerHTML = html;
-  var res = [this.el_.offsetWidth, this.el_.offsetHeight];
-  this.el_.innerHTML = '';
-  return res;
-};
-
-HtmlSizer_.prototype.width = function(html) {
-  return this.size(html)[0];
-};
-
-HtmlSizer_.prototype.height = function(html) {
-  return this.size(html)[1];
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Model_
-
-function Model_() {
+function Model() {
   this.text_ = '';
   this.selStart_ = 0;
   this.selEnd_ = 0;
@@ -70,43 +44,43 @@ function Model_() {
   this.listeners_[events.EventType.SET_SELECTION_RANGE] = [];
 }
 
-Model_.prototype.getText = function() {
+Model.prototype.getText = function() {
   return this.text_;
 };
 
-Model_.prototype.getSelectionRange = function() {
+Model.prototype.getSelectionRange = function() {
   return [this.selStart_, this.selEnd_];
 };
 
-Model_.prototype.insertText = function(pos, value) {
+Model.prototype.insertText = function(pos, value) {
   this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos);
   this.selStart_ = pos + value.length;
   this.selEnd_ = this.selStart_;
   this.dispatchEvent_(new events.InsertTextEvent(true, pos, value));
 };
 
-Model_.prototype.deleteText = function(pos, len) {
+Model.prototype.deleteText = function(pos, len) {
   this.text_ = this.text_.substr(0, pos) + this.text_.substr(pos + len);
   this.selStart_ = pos;
   this.selEnd_ = this.selStart_;
   this.dispatchEvent_(new events.DeleteTextEvent(true, pos, len));
 };
 
-Model_.prototype.setSelectionRange = function(start, end) {
+Model.prototype.setSelectionRange = function(start, end) {
   this.selStart_ = start;
   this.selEnd_ = end;
   this.dispatchEvent_(new events.SetSelectionRangeEvent(true, start, end));
 };
 
-Model_.prototype.addEventListener = function(type, handler) {
+Model.prototype.addEventListener = function(type, handler) {
   this.listeners_[type].push(handler);
 };
 
-Model_.prototype.removeEventListener = function(type, handler) {
+Model.prototype.removeEventListener = function(type, handler) {
   util.removeFromArray(handler, this.listeners_[type]);
 };
 
-Model_.prototype.dispatchEvent_ = function(e) {
+Model.prototype.dispatchEvent_ = function(e) {
   var arr = this.listeners_[e.type];
   for (var i = 0; i < arr.length; i++) {
     arr[i](e);
@@ -114,9 +88,9 @@ Model_.prototype.dispatchEvent_ = function(e) {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Cursor_
+// Cursor
 
-function Cursor_() {
+function Cursor() {
   // If true, cursor should be rendered to the right of the char at offset p-1
   // rather than at the left edge of the char at offset p. This can happen when
   // user presses the "end" key or clicks past the end of a line.
@@ -143,18 +117,18 @@ function Cursor_() {
   }).bind(this), 100);
 }
 
-Cursor_.prototype.show = function(blink) {
+Cursor.prototype.show = function(blink) {
   this.blinkTimer_ = (blink ? 0 : -1);
   this.el_.style.visibility = 'visible';
 };
 
-Cursor_.prototype.hide = function() {
+Cursor.prototype.hide = function() {
   this.blinkTimer_ = -1;
   this.el_.style.visibility = 'hidden';
 };
 
 // Here, bottom means "distance from top of editor to bottom of cursor".
-Cursor_.prototype.move = function(left, bottom, height) {
+Cursor.prototype.move = function(left, bottom, height) {
   if (DEBUG) console.log(left, bottom, height);
   this.el_.style.left = left + 'px';
   this.el_.style.top = bottom - height + 'px';
@@ -179,7 +153,7 @@ function Editor(editorEl, model) {
 }
 
 Editor.prototype.reset = function(model) {
-  this.m_ = model || new Model_();
+  this.m_ = model || new Model();
 
   // Register model event handlers.
   this.m_.addEventListener(
@@ -195,7 +169,7 @@ Editor.prototype.reset = function(model) {
   this.mouseIsDown_ = false;
 
   this.clipboard_ = '';
-  this.cursor_ = new Cursor_();
+  this.cursor_ = new Cursor();
 
   // Updated by insertText_ and deleteText_.
   this.charSizes_ = [];       // array of [width, height]
@@ -212,7 +186,7 @@ Editor.prototype.reset = function(model) {
   // Remove any existing children, then add innerEl.
   while (this.el_.firstChild) this.el_.removeChild(this.el_.firstChild);
   this.el_.appendChild(this.innerEl_);
-  this.hs_ = new HtmlSizer_(this.el_);
+  this.hs_ = new HtmlSizer(this.el_);
 
   // Set fields that depend on DOM.
   this.borderWidth_ = parseInt(window.getComputedStyle(
@@ -762,7 +736,7 @@ Editor.prototype.handleMouseDown_ = function(e) {
 
   var innerRect = this.innerEl_.getBoundingClientRect();
 
-  // If the click's X position was outside innerRect, the click must have been
+  // If the click's x position was outside innerRect, the click must have been
   // on el_'s scroll bar.
   if (e.clientX < innerRect.left || e.clientX > innerRect.right) {
     this.mouseIsDown_ = false;

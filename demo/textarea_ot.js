@@ -1,18 +1,14 @@
 'use strict';
 
-var TextAreaEditor = require('../client/textarea_editor');
+var TextAreaEditor = require('../client/editor');
 var load = require('../client/ot').load;
 
-var editor1, editor2;
-
-function qs(selector) {
-  return document.querySelector(selector);
-}
+var ed1, ed2;
 
 load(0, function(doc) {
-  editor1 = new TextAreaEditor(qs('#editor1'), doc.getModel());
+  ed1 = new TextAreaEditor(document.querySelector('#ed1'), doc.getModel());
 });
 
 load(0, function(doc) {
-  editor2 = new TextAreaEditor(qs('#editor2'), doc.getModel());
+  ed2 = new TextAreaEditor(document.querySelector('#ed2'), doc.getModel());
 });

@@ -9,22 +9,11 @@
   <body data-ws-url="{{.Socket}}">
     <h1>{{.Name}}</h1>
 
-    <div>
-      <textarea id="editor1" rows="10" cols="50"></textarea>
-      <div>
-        <button id="undo-button" class="display-none" disabled>Undo</button>
-        <button id="redo-button" class="display-none" disabled>Redo</button>
-      </div>
-    </div>
+    <textarea id="ed1" rows="10" cols="50"></textarea>
     <br>
-    <div>
-      <textarea id="editor2" rows="10" cols="50"></textarea>
-      <div>
-        <button id="undo-button" class="display-none" disabled>Undo</button>
-        <button id="redo-button" class="display-none" disabled>Redo</button>
-      </div>
-    </div>
+    <textarea id="ed2" rows="10" cols="50"></textarea>
 
+    <!-- TODO: Use browserify. -->
     <script src="../util.js"></script>
     <script src="../events.js"></script>
     <script src="../textarea_editor.js"></script>

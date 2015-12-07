@@ -3,16 +3,12 @@
 var Editor = require('../client/editor');
 var load = require('../client/ot').load;
 
-var editor1, editor2;
-
-function qs(selector) {
-  return document.querySelector(selector);
-}
+var ed1, ed2;
 
 load(0, function(doc) {
-  editor1 = new Editor(qs('#editor1'), doc.getModel());
+  ed1 = new Editor(document.querySelector('#ed1'), doc.getModel());
 });
 
 load(0, function(doc) {
-  editor2 = new Editor(qs('#editor2'), doc.getModel());
+  ed2 = new Editor(document.querySelector('#ed2'), doc.getModel());
 });
