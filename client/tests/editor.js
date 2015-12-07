@@ -170,27 +170,27 @@ test(TG.k + 'insert and left/right', function(t) {
   type('abc');
   t.deepEqual(state(), ['abc', 3]);
   fireKeyDownSeq('right');
-  t.deepEqual(cursorPos(), 3);
+  t.equal(cursorPos(), 3);
   fireKeyDownSeq('left');
-  t.deepEqual(cursorPos(), 2);
+  t.equal(cursorPos(), 2);
   type('de');
   t.deepEqual(state(), ['abdec', 4]);
   fireKeyDownSeq('left left left left');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   fireKeyDownSeq('left');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   type('fg');
   t.deepEqual(state(), ['fgabdec', 2]);
   fireKeyDownSeq('right right left right');
-  t.deepEqual(cursorPos(), 4);
+  t.equal(cursorPos(), 4);
 
   // Now with some newline chars.
   type('h\nij\n');
   t.deepEqual(state(), ['fgabh\nij\ndec', 9]);
   fireKeyDownSeq('left left left left left');
-  t.deepEqual(cursorPos(), 4);
+  t.equal(cursorPos(), 4);
   fireKeyDownSeq('right right right right right');
-  t.deepEqual(cursorPos(), 9);
+  t.equal(cursorPos(), 9);
   end(t);
 });
 
@@ -223,41 +223,41 @@ test(TG.k + 'home/end', function(t) {
   t.deepEqual(state(), ['', 0]);
   type('123');
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   fireKeyDownSeq('end');
-  t.deepEqual(cursorPos(), 3);
+  t.equal(cursorPos(), 3);
   fireKeyDownSeq('left home');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   fireKeyDownSeq('right end');
-  t.deepEqual(cursorPos(), 3);
+  t.equal(cursorPos(), 3);
   end(t);
 });
 
 test(TG.k + 'home/end with newlines', function(t) {
   type('123\n456\n789');
-  t.deepEqual(cursorPos(), 11);
+  t.equal(cursorPos(), 11);
   fireKeyDownSeq('end');
-  t.deepEqual(cursorPos(), 11);
+  t.equal(cursorPos(), 11);
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 8);
+  t.equal(cursorPos(), 8);
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 8);
+  t.equal(cursorPos(), 8);
   fireKeyDownSeq('left');
-  t.deepEqual(cursorPos(), 7);
+  t.equal(cursorPos(), 7);
   fireKeyDownSeq('end');
-  t.deepEqual(cursorPos(), 7);
+  t.equal(cursorPos(), 7);
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 4);
+  t.equal(cursorPos(), 4);
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 4);
+  t.equal(cursorPos(), 4);
   fireKeyDownSeq('left');
-  t.deepEqual(cursorPos(), 3);
+  t.equal(cursorPos(), 3);
   fireKeyDownSeq('end');
-  t.deepEqual(cursorPos(), 3);
+  t.equal(cursorPos(), 3);
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   end(t);
 });
 
@@ -318,7 +318,7 @@ test(TG.k + 'ctrl+delete, ctrl+backspace', function(t) {
   t.deepEqual(state(), ['', 0]);
 
   type('aa bb  cc');
-  t.deepEqual(cursorPos(), 9);
+  t.equal(cursorPos(), 9);
   fireKeyDownSeq('ctrl+delete');
   t.deepEqual(state(), ['aa bb  cc', 9]);
   fireKeyDownSeq('ctrl+backspace');
@@ -330,7 +330,7 @@ test(TG.k + 'ctrl+delete, ctrl+backspace', function(t) {
 
   type('aa bb  cc');
   fireKeyDownSeq('home');
-  t.deepEqual(cursorPos(), 0);
+  t.equal(cursorPos(), 0);
   fireKeyDownSeq('ctrl+backspace');
   t.deepEqual(state(), ['aa bb  cc', 0]);
   fireKeyDownSeq('ctrl+delete');
@@ -341,11 +341,11 @@ test(TG.k + 'ctrl+delete, ctrl+backspace', function(t) {
   t.deepEqual(state(), ['', 0]);
 
   type(' ');
-  t.deepEqual(cursorPos(), 1);
+  t.equal(cursorPos(), 1);
   fireKeyDownSeq('ctrl+backspace');
   t.deepEqual(state(), ['', 0]);
   type(' ');
-  t.deepEqual(cursorPos(), 1);
+  t.equal(cursorPos(), 1);
   fireKeyDownSeq('home ctrl+delete');
   t.deepEqual(state(), ['', 0]);
   end(t);
@@ -525,7 +525,7 @@ test(TG.k + 'select, then home/end', function(t) {
 
 test(TG.rbs + 'innerWidth', function(t) {
   // Tests below assume that one line can fit 37 W's.
-  t.deepEqual(Math.floor(ed.innerWidth_ / W_WIDTH), 37);
+  t.equal(Math.floor(ed.innerWidth_ / W_WIDTH), 37);
   end(t);
 });
 
@@ -696,8 +696,8 @@ test(TG.rbs + 'up/down with wrapped line', function(t) {
 test(TG.rbs + 'up/down with chars of different widths', function(t) {
   type('W\nTT\nW \nTW\n    \nW\n');
   // This test relies on the following invariants.
-  t.deepEqual(T_WIDTH * 1.5, W_WIDTH);
-  t.deepEqual(SPACE_WIDTH * 2.5, T_WIDTH);
+  t.equal(T_WIDTH * 1.5, W_WIDTH);
+  t.equal(SPACE_WIDTH * 2.5, T_WIDTH);
   // Initial cursor left is 0px.
   t.deepEqual(cursorState(), [18, 6, 0]);
   fireKeyDownSeq('up');
@@ -798,30 +798,30 @@ test(TG.ks + 'cut, copy, paste', function(t) {
   type(s);
 
   t.deepEqual(state(), [s, 8]);
-  t.deepEqual(ed.clipboard_, '');
+  t.equal(ed.clipboard_, '');
   fireKeyDownSeq('meta+C meta+X meta+V');
   t.deepEqual(state(), [s, 8]);
-  t.deepEqual(ed.clipboard_, '');
+  t.equal(ed.clipboard_, '');
 
   fireKeyDownSeq('shift+ctrl+left meta+X');
   t.deepEqual(state(), ['aa bb ', 6]);
-  t.deepEqual(ed.clipboard_, 'cc');
+  t.equal(ed.clipboard_, 'cc');
   fireKeyDownSeq('meta+V');
   t.deepEqual(state(), [s, 8]);
-  t.deepEqual(ed.clipboard_, 'cc');
+  t.equal(ed.clipboard_, 'cc');
 
   fireKeyDownSeq('ctrl+left left shift+ctrl+left meta+C delete');
   t.deepEqual(state(), ['aa  cc', 3]);
-  t.deepEqual(ed.clipboard_, 'bb');
+  t.equal(ed.clipboard_, 'bb');
   fireKeyDownSeq('meta+V');
   t.deepEqual(state(), [s, 5]);
-  t.deepEqual(ed.clipboard_, 'bb');
+  t.equal(ed.clipboard_, 'bb');
 
   fireKeyDownSeq('meta+A meta+C');
-  t.deepEqual(ed.clipboard_, s);
+  t.equal(ed.clipboard_, s);
   fireKeyDownSeq('meta+V meta+V');
   t.deepEqual(state(), [s + s, 16]);
-  t.deepEqual(ed.clipboard_, s);
+  t.equal(ed.clipboard_, s);
   end(t);
 });
 
@@ -830,13 +830,13 @@ test(TG.ks + 'multiple cut/copy commands', function(t) {
   type(s);
   fireKeyDownSeq('shift+left meta+C');
   t.deepEqual(state(), [s, 4, 3]);
-  t.deepEqual(ed.clipboard_, 'd');
+  t.equal(ed.clipboard_, 'd');
   fireKeyDownSeq('left shift+home meta+C');
   t.deepEqual(state(), [s, 3, 0]);
-  t.deepEqual(ed.clipboard_, 'abc');
+  t.equal(ed.clipboard_, 'abc');
   fireKeyDownSeq('shift+right meta+X');
   t.deepEqual(state(), ['ad', 1]);
-  t.deepEqual(ed.clipboard_, 'bc');
+  t.equal(ed.clipboard_, 'bc');
   end(t);
 });
 
@@ -865,8 +865,8 @@ test(TG.hs + 'size of two chars', function(t) {
 });
 
 test(TG.hs + 'width and height', function(t) {
-  t.deepEqual(hs.width('W'), W_WIDTH);
-  t.deepEqual(hs.height('W'), W_HEIGHT);
+  t.equal(hs.width('W'), W_WIDTH);
+  t.equal(hs.height('W'), W_HEIGHT);
   t.end();
 });
 
