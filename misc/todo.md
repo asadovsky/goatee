@@ -1,3 +1,7 @@
+# General
+
+- Use ES2015 via https://babeljs.io/
+
 # Editor
 
 - Add more tests

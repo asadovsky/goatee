@@ -18,8 +18,6 @@
 // - Show other users' selections/cursors
 // - Smarter handling of cursor_.prevLeft on non-local text mutations
 
-// FIXME: Fix lint errors.
-
 'use strict';
 
 var events = require('./events');
@@ -411,14 +409,14 @@ Editor.prototype.deleteSelection_ = function() {
 Editor.prototype.computeCursorRowAndLeft_ = function() {
   var numRows = this.linePOffsets_.length;
   var selEnd = this.m_.getSelectionRange()[1];
-  var row = 0;
+  var p, row = 0;
   // TODO: Use binary search.
   for (; row < numRows - 1; row++) {
-    var p = this.linePOffsets_[row][1];
+    p = this.linePOffsets_[row][1];
     if (selEnd < p || (selEnd === p && this.cursor_.append)) break;
   }
   var left = 0;
-  for (var p = this.linePOffsets_[row][0]; p < selEnd; p++) {
+  for (p = this.linePOffsets_[row][0]; p < selEnd; p++) {
     left += this.charSizes_[p][0];
   }
   return [row, left];
@@ -426,8 +424,9 @@ Editor.prototype.computeCursorRowAndLeft_ = function() {
 
 Editor.prototype.renderSelection_ = function(updateScroll) {
   var els = this.textEl_.querySelectorAll('.highlight');
+  var el;
   for (var i = 0; i < els.length; i++) {
-    var el = els[i];
+    el = els[i];
     el.parentNode.removeChild(el);
   }
 
@@ -435,7 +434,8 @@ Editor.prototype.renderSelection_ = function(updateScroll) {
   this.cursor_.row = row;
   this.cursor_.left = left;
 
-  var tup = this.lineYOffsets_[row], top = tup[0], bottom = tup[1];
+  tup = this.lineYOffsets_[row];
+  var top = tup[0], bottom = tup[1];
   this.cursor_.move(left, bottom, bottom - top);
 
   if (updateScroll) {
@@ -477,16 +477,17 @@ Editor.prototype.renderSelection_ = function(updateScroll) {
     var numRows = this.linePOffsets_.length;
     console.assert(numRows === this.textEl_.children.length);
 
-    for (var row = 0; row < numRows; row++) {
+    for (row = 0; row < numRows; row++) {
       var beginEnd = this.linePOffsets_[row];
       if (sel[0] >= beginEnd[1]) continue;
       if (sel[1] <= beginEnd[0]) break;
 
-      var el = document.createElement('div');
+      el = document.createElement('div');
       el.className = 'highlight';
 
       // Compute left.
-      var p = beginEnd[0], left = 0;
+      var p = beginEnd[0];
+      left = 0;
       for (; p < sel[0]; p++) left += this.charSizes_[p][0];
       el.style.left = left + 'px';
 
@@ -570,14 +571,14 @@ Editor.prototype.renderAll_ = function(updateScroll) {
   this.textEl_.innerHTML = html;
 
   // Compute lineYOffsets.
-  this.lineYOffsets_ = new Array(numRows);
   var numRows = this.linePOffsets_.length;
   var beginPx = 0;
   var emptyLineHeight = this.hs_.height(this.makeLineHtml_('', p));
-  for (var row = 0; row < numRows; row++) {
+  this.lineYOffsets_ = new Array(numRows);
+  for (row = 0; row < numRows; row++) {
     var lineHeight = emptyLineHeight;
     var beginEnd = this.linePOffsets_[row];
-    for (var p = beginEnd[0]; p < beginEnd[1]; p++) {
+    for (p = beginEnd[0]; p < beginEnd[1]; p++) {
       lineHeight = Math.max(lineHeight, this.charSizes_[p][1]);
     }
     this.lineYOffsets_[row] = [beginPx, beginPx + lineHeight];
@@ -622,8 +623,7 @@ Editor.prototype.handleKeyDown_ = function(e) {
     switch (c) {
     case 'V':
       if (sel !== null) this.deleteSelection_();
-      var p = this.getCursorPos_();
-      this.insertText_(p, this.clipboard_);
+      this.insertText_(this.getCursorPos_(), this.clipboard_);
       break;
     case 'A':
       this.setSelectionFromP_(0, true);
@@ -643,6 +643,7 @@ Editor.prototype.handleKeyDown_ = function(e) {
     return;
   }
 
+  var selEnd, p;
   switch (e.which) {
   case 35:  // end
     // Note, we use setSelectionFromRowAndX_ because we want to place the cursor
@@ -656,10 +657,10 @@ Editor.prototype.handleKeyDown_ = function(e) {
     break;
   case 37:  // left arrow
     if (e.shiftKey) {
-      var selEnd = this.m_.getSelectionRange()[1];
+      selEnd = this.m_.getSelectionRange()[1];
       this.setSelectionFromP_(this.cursorHop_(selEnd, false, e.ctrlKey), false);
     } else if (sel === null) {
-      var p = this.getCursorPos_();
+      p = this.getCursorPos_();
       this.setSelectionFromP_(this.cursorHop_(p, false, e.ctrlKey), true);
     } else if (e.ctrlKey) {
       this.setSelectionFromP_(this.cursorHop_(sel[0], false, true), true);
@@ -678,10 +679,10 @@ Editor.prototype.handleKeyDown_ = function(e) {
     break;
   case 39:  // right arrow
     if (e.shiftKey) {
-      var selEnd = this.m_.getSelectionRange()[1];
+      selEnd = this.m_.getSelectionRange()[1];
       this.setSelectionFromP_(this.cursorHop_(selEnd, true, e.ctrlKey), false);
     } else if (sel === null) {
-      var p = this.getCursorPos_();
+      p = this.getCursorPos_();
       this.setSelectionFromP_(this.cursorHop_(p, true, e.ctrlKey), true);
     } else if (e.ctrlKey) {
       this.setSelectionFromP_(this.cursorHop_(sel[1], true, true), true);
@@ -702,7 +703,7 @@ Editor.prototype.handleKeyDown_ = function(e) {
     if (sel !== null) {
       this.deleteSelection_();
     } else {
-      var p = this.getCursorPos_();
+      p = this.getCursorPos_();
       var beginP = this.cursorHop_(p, false, e.ctrlKey);
       this.deleteText_(beginP, p - beginP);
     }
@@ -711,7 +712,7 @@ Editor.prototype.handleKeyDown_ = function(e) {
     if (sel !== null) {
       this.deleteSelection_();
     } else {
-      var p = this.getCursorPos_();
+      p = this.getCursorPos_();
       var endP = this.cursorHop_(p, true, e.ctrlKey);
       this.deleteText_(p, endP - p);
     }
