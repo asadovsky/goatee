@@ -11,6 +11,7 @@
 
 'use strict';
 
+var _ = require('lodash');
 var test = require('tape');
 
 var constants = require('../constants');
@@ -852,9 +853,9 @@ test(TG.ks + 'change selection, then paste', function(t) {
 
 var LINE_HEIGHT = 16;
 
-var hs = new HtmlSizer(document.body, constants.baseStyle, {
+var hs = new HtmlSizer(document.body, _.assign({}, constants.baseStyle, {
   font: constants.editorStyle.font
-});
+}));
 
 test(TG.hs + 'size of one char', function(t) {
   t.deepEqual(hs.size('W'), [W_WIDTH, LINE_HEIGHT]);
