@@ -6,3 +6,8 @@
 # CRDT
 
 - https://pages.lip6.fr/Marc.Shapiro/
+
+# Not yet vetted
+
+- https://github.com/bnoguchi/logoot/tree/master/lib
+- https://github.com/patriknw/akka-data-replication/tree/master/src/main/scala/akka/contrib/datareplication

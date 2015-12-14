@@ -2,20 +2,27 @@
 
 'use strict';
 
+var _ = require('lodash');
+
 module.exports = HtmlSizer;
 
-function HtmlSizer(parentEl) {
+function HtmlSizer(parentEl, style) {
   this.el_ = document.createElement('div');
-  this.el_.style.position = 'fixed';
-  this.el_.style.top = '-1000px';
-  this.el_.style.left = '-1000px';
-  this.el_.style.visibilty = 'hidden';
+  _.assign(this.el_.style, style, {
+    position: 'fixed',
+    top: '-1000px',
+    left: '-1000px',
+    visibilty: 'hidden',
+    whiteSpace: 'pre'
+  });
   parentEl.appendChild(this.el_);
 }
 
 HtmlSizer.prototype.size = function(html) {
   this.el_.innerHTML = html;
-  var res = [this.el_.offsetWidth, this.el_.offsetHeight];
+  // Note, getBoundingClientRect returns fractional width and height.
+  var rect = this.el_.getBoundingClientRect();
+  var res = [rect.width, rect.height];
   this.el_.innerHTML = '';
   return res;
 };

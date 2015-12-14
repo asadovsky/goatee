@@ -1,6 +1,6 @@
 'use strict';
 
-var TextAreaEditor = require('../client/editor');
+var TextAreaEditor = require('../client/textarea_editor');
 var load = require('../client/ot').load;
 
 var ed1, ed2;

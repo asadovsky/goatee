@@ -1,12 +1,9 @@
-// Editor class.
-//
-// Model stores text and selection range. UI state (e.g. charSizes_,
-// linePOffsets_) lives in Editor, not in model.
+// Implementation of Editor interface.
 //
 // TODO:
 // - For faster text mutations, represent text using something like
 //   https://github.com/josephg/jumprope
-// - Make select-scroll smooth
+// - Make select-scroll smoother
 // - Support bold, italics
 // - Support font-size and line-height
 // - Support non-ASCII characters
@@ -15,75 +12,33 @@
 // - Consider using React
 //
 // OT-specific TODO:
-// - Show other users' selections/cursors
-// - Smarter handling of cursor_.prevLeft on non-local text mutations
+// - Show other users' cursors/selections
+// - Retain cursor_.prevLeft when applying non-local text mutations
 
 'use strict';
 
-var events = require('./events');
-var HtmlSizer = require('./html_sizer');
-var util = require('./util');
+var _ = require('lodash');
+var inherits = require('inherits');
 
+var EditorInterface = require('./editor');
+var HtmlSizer = require('./html_sizer');
+var LocalModel = require('./local_model');
+var util = require('../util');
+
+inherits(Editor, EditorInterface);
 module.exports = Editor;
 
 var DEBUG = 0;
+var DEFAULT_STYLE = {
+  boxSizing: 'border-box',
+  webkitUserSelect: 'none'
+};
 
-////////////////////////////////////////////////////////////////////////////////
-// Model
-
-function Model() {
-  this.text_ = '';
-  this.selStart_ = 0;
-  this.selEnd_ = 0;
-
-  this.listeners_ = {};
-  this.listeners_[events.EventType.INSERT_TEXT] = [];
-  this.listeners_[events.EventType.DELETE_TEXT] = [];
-  this.listeners_[events.EventType.SET_SELECTION_RANGE] = [];
+function createDiv(style) {
+  var el = document.createElement('div');
+  _.assign(el.style, DEFAULT_STYLE, style);
+  return el;
 }
-
-Model.prototype.getText = function() {
-  return this.text_;
-};
-
-Model.prototype.getSelectionRange = function() {
-  return [this.selStart_, this.selEnd_];
-};
-
-Model.prototype.insertText = function(pos, value) {
-  this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos);
-  this.selStart_ = pos + value.length;
-  this.selEnd_ = this.selStart_;
-  this.dispatchEvent_(new events.InsertTextEvent(true, pos, value));
-};
-
-Model.prototype.deleteText = function(pos, len) {
-  this.text_ = this.text_.substr(0, pos) + this.text_.substr(pos + len);
-  this.selStart_ = pos;
-  this.selEnd_ = this.selStart_;
-  this.dispatchEvent_(new events.DeleteTextEvent(true, pos, len));
-};
-
-Model.prototype.setSelectionRange = function(start, end) {
-  this.selStart_ = start;
-  this.selEnd_ = end;
-  this.dispatchEvent_(new events.SetSelectionRangeEvent(true, start, end));
-};
-
-Model.prototype.addEventListener = function(type, handler) {
-  this.listeners_[type].push(handler);
-};
-
-Model.prototype.removeEventListener = function(type, handler) {
-  util.removeFromArray(handler, this.listeners_[type]);
-};
-
-Model.prototype.dispatchEvent_ = function(e) {
-  var arr = this.listeners_[e.type];
-  for (var i = 0; i < arr.length; i++) {
-    arr[i](e);
-  }
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Cursor
@@ -104,8 +59,13 @@ function Cursor() {
 
   this.blinkTimer_ = 0;
 
-  this.el_ = document.createElement('div');
-  this.el_.className = 'cursor';
+  this.el_ = createDiv({
+    position: 'absolute',
+    width: '2px',
+    backgroundColor: '#000',
+    borderBottom: '3px solid #fff',
+    zIndex: '2'
+  });
 
   window.setInterval((function() {
     if (this.blinkTimer_ === -1) return;
@@ -136,10 +96,21 @@ Cursor.prototype.move = function(left, bottom, height) {
 ////////////////////////////////////////////////////////////////////////////////
 // Editor
 
-function Editor(editorEl, model) {
-  this.el_ = editorEl;
-  this.el_.className = 'goatee-ed';
+function Editor(el, model) {
+  EditorInterface.call(this);
+  this.el_ = el;
   this.reset(model);
+
+  // TODO: Use shadow DOM.
+  _.assign(this.el_.style, DEFAULT_STYLE, {
+    border: '1px solid #c0c0c0',
+    padding: '8px',
+    width: '600px',
+    height: '200px',
+    background: '#fff',
+    font: '400 16px/1 Arial, sans-serif',
+    overflowY: 'scroll'
+  });
 
   // Register input handlers.
   // TODO: Provide some way to remove these document event handlers.
@@ -151,16 +122,19 @@ function Editor(editorEl, model) {
 }
 
 Editor.prototype.reset = function(model) {
-  this.m_ = model || new Model();
+  // Remove any existing children, then add HtmlSizer.
+  while (this.el_.firstChild) this.el_.removeChild(this.el_.firstChild);
+  this.hs_ = new HtmlSizer(this.el_, DEFAULT_STYLE);
+
+  this.m_ = model || new LocalModel();
 
   // Register model event handlers.
-  this.m_.addEventListener(
-    events.EventType.INSERT_TEXT, this.handleInsertText_.bind(this));
-  this.m_.addEventListener(
-    events.EventType.DELETE_TEXT, this.handleDeleteText_.bind(this));
-  this.m_.addEventListener(
-    events.EventType.SET_SELECTION_RANGE,
-    this.handleSetSelectionRange_.bind(this));
+  this.m_.on('insertText', this.handleInsertText_.bind(this));
+  this.m_.on('deleteText', this.handleDeleteText_.bind(this));
+  this.m_.on('setSelectionRange', this.handleSetSelectionRange_.bind(this));
+
+  // Note: Internal UI state (e.g. charSizes_, linePOffsets_) lives in Editor,
+  // not Model.
 
   // Reset internal state.
   this.hasFocus_ = false;
@@ -175,16 +149,17 @@ Editor.prototype.reset = function(model) {
   this.linePOffsets_ = null;  // array of [beginP, endP]
   this.lineYOffsets_ = null;  // array of [begin, end] px relative to window top
 
-  this.textEl_ = document.createElement('div');
-  this.innerEl_ = document.createElement('div');
+  this.textEl_ = createDiv();
+  this.innerEl_ = createDiv({
+    position: 'relative',
+    width: '100%',
+    minHeight: '100%',
+    cursor: 'text'
+  });
   this.innerEl_.className = 'editor-inner';
   this.innerEl_.appendChild(this.textEl_);
   this.innerEl_.appendChild(this.cursor_.el_);
-
-  // Remove any existing children, then add innerEl.
-  while (this.el_.firstChild) this.el_.removeChild(this.el_.firstChild);
   this.el_.appendChild(this.innerEl_);
-  this.hs_ = new HtmlSizer(this.el_);
 
   // Set fields that depend on DOM.
   this.borderWidth_ = parseInt(window.getComputedStyle(
@@ -319,8 +294,7 @@ Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
 
 // Updates state given row and x position (in pixels), then renders selection.
 // Assumes linePOffsets_, lineYOffsets_, and charSizes_ are up-to-date.
-Editor.prototype.setSelectionFromRowAndX_ = function(
-  row, x, updateSelStart, clearPrevLeft) {
+Editor.prototype.setSelectionFromRowAndX_ = function(row, x, updateSelStart, clearPrevLeft) {  // jshint ignore: line
   // Find char whose left is closest to x.
   var beginEnd = this.linePOffsets_[row];
   var pEnd = beginEnd[1];
@@ -352,36 +326,23 @@ Editor.prototype.setSelectionFromRowAndX_ = function(
 ////////////////////////////////////////////////////////////////////////////////
 // Text state update methods
 
-Editor.ESCAPE_CHAR_MAP_ = {
-  ' ': '&nbsp;',
-  '"': '&quot;',
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;'
-};
-
-Editor.escapeChar_ = function(c) {
-  var x = Editor.ESCAPE_CHAR_MAP_[c];
-  return x ? x : c;
-};
-
 // Generates html for the given text, assuming the text starts at position p.
-// Note, currently we don't use p, but eventually we'll need it to determine
+// Note: We currently don't use p, but eventually we'll need it to determine
 // styling (e.g. bold).
+// TODO: Switch to returning an Element object.
 Editor.prototype.makeLineHtml_ = function(text, p) {
-  var res = '';
-  var len = text.length;
-  for (var i = 0; i < len; i++) {
-    var c = text.charAt(i);
-    if (c === '\n') {
-      c = '';
-    } else {
-      c = Editor.escapeChar_(c);
-    }
-    console.assert(!/\s/.test(c), c.charCodeAt(0));
-    res += c;
-  }
-  return '<div class="line"><div class="line-inner">' + res + '</div></div>';
+  var lineEl = createDiv({
+    position: 'relative',
+    minHeight: '19px'  // editor font-size + cursor border-bottom
+  });
+  var lineInnerEl = createDiv({
+    position: 'relative',
+    whiteSpace: 'pre',
+    zIndex: '1'
+  });
+  lineInnerEl.textContent = text;
+  lineEl.appendChild(lineInnerEl);
+  return lineEl.outerHTML;
 };
 
 Editor.prototype.insertText_ = function(p, value) {
@@ -423,7 +384,7 @@ Editor.prototype.computeCursorRowAndLeft_ = function() {
 };
 
 Editor.prototype.renderSelection_ = function(updateScroll) {
-  var els = this.textEl_.querySelectorAll('.highlight');
+  var els = this.textEl_.querySelectorAll('.selection');
   var el;
   for (var i = 0; i < els.length; i++) {
     el = els[i];
@@ -482,8 +443,13 @@ Editor.prototype.renderSelection_ = function(updateScroll) {
       if (sel[0] >= beginEnd[1]) continue;
       if (sel[1] <= beginEnd[0]) break;
 
-      el = document.createElement('div');
-      el.className = 'highlight';
+      el = createDiv({
+        position: 'absolute',
+        top: '0',
+        backgroundColor: '#bbdefb',
+        height: '100%'
+      });
+      el.className = 'selection';
 
       // Compute left.
       var p = beginEnd[0];
@@ -537,7 +503,7 @@ Editor.prototype.renderAll_ = function(updateScroll) {
     } else {
       lineWidth += this.charSizes_[p][0];
       if (c === ' ') lineLastSpace = p - lineBegin;
-      // NOTE: Supporting an "on-demand" native scroll bar would be tricky. For
+      // Note: Supporting an "on-demand" native scroll bar would be tricky. For
       // now, we make the scroll bar "always-on".
       if (lineWidth <= this.innerWidth_) {
         p++;
@@ -590,10 +556,9 @@ Editor.prototype.renderAll_ = function(updateScroll) {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Input handlers
+// Input event handlers
 
-// We ignore these keypress codes.
-var IGNORE_KEYPRESS = {
+var IGNORED_KEYPRESS_CODES = {
   63232: true,  // ctrl up
   63233: true,  // ctrl down
   63234: true,  // ctrl left
@@ -604,7 +569,7 @@ var IGNORE_KEYPRESS = {
 Editor.prototype.handleKeyPress_ = function(e) {
   if (!this.hasFocus_ || this.mouseIsDown_) return;
 
-  if (IGNORE_KEYPRESS[e.which]) return;
+  if (IGNORED_KEYPRESS_CODES[e.which]) return;
   if (e.which > 127) return;  // require ASCII for now
   e.preventDefault();
   if (this.getSelectionOrNull_() !== null) this.deleteSelection_();
@@ -617,7 +582,7 @@ Editor.prototype.handleKeyDown_ = function(e) {
   if (!this.hasFocus_ || this.mouseIsDown_) return;
 
   var sel = this.getSelectionOrNull_();
-  // TODO: For Linux and Windows, require ctrlKey instead of metaKey.
+  // TODO: On Linux and Windows, require ctrlKey instead of metaKey.
   if (e.metaKey) {
     var c = String.fromCharCode(e.which);
     switch (c) {

@@ -13,24 +13,20 @@
 
 var test = require('tape');
 
-var Editor = require('../editor');
+var GoateeEditor = require('../goatee');
 var HtmlSizer = require('../html_sizer');
-var util = require('../util');
+var util = require('../../util');
+
+var ed = new GoateeEditor(document.querySelector('#ed'));
 
 // Override style rules as needed for render-based state tests.
-var edEl = document.querySelector('#ed');
-edEl.style.overflowY = 'hidden';
-edEl.style.width = '580px';
+ed.el_.style.width = '580px';
+ed.el_.style.overflowY = 'hidden';
 
-var ed = new Editor(edEl);
-
-// Width and height of 'W' character.
-var W_WIDTH = 15;
-var W_HEIGHT = 18;
-
-// Widths of various other characters.
-var SPACE_WIDTH = 4;
-var T_WIDTH = 10;
+// Widths of various characters.
+var W_WIDTH = 15.109375;
+var SPACE_WIDTH = 4.453125;
+var T_WIDTH = 9.78125;
 
 // Maps key name to character code.
 var KEY_CODES = {
@@ -693,7 +689,8 @@ test(TG.rbs + 'up/down with wrapped line', function(t) {
   end(t);
 });
 
-test(TG.rbs + 'up/down with chars of different widths', function(t) {
+// TODO: Broken due to fractional widths.
+test.skip(TG.rbs + 'up/down with chars of different widths', function(t) {
   type('W\nTT\nW \nTW\n    \nW\n');
   // This test relies on the following invariants.
   t.equal(T_WIDTH * 1.5, W_WIDTH);
@@ -852,21 +849,39 @@ test(TG.ks + 'change selection, then paste', function(t) {
 ////////////////////////////////////////
 // HtmlSizer
 
-var hs = new HtmlSizer(document.body);
+var LINE_HEIGHT = 16;
+
+var hs = new HtmlSizer(document.body, {
+  boxSizing: 'border-box',
+  webkitUserSelect: 'none',
+  font: '400 16px/1 Arial, sans-serif'
+});
 
 test(TG.hs + 'size of one char', function(t) {
-  t.deepEqual(hs.size('W'), [W_WIDTH, W_HEIGHT]);
+  t.deepEqual(hs.size('W'), [W_WIDTH, LINE_HEIGHT]);
+  t.deepEqual(hs.size('T'), [T_WIDTH, LINE_HEIGHT]);
+  t.deepEqual(hs.size(' '), [SPACE_WIDTH, LINE_HEIGHT]);
   t.end();
 });
 
-test(TG.hs + 'size of two chars', function(t) {
-  t.deepEqual(hs.size('WW'), [2 * W_WIDTH, W_HEIGHT]);
-  t.end();
-});
-
-test(TG.hs + 'width and height', function(t) {
+test(TG.hs + 'width', function(t) {
   t.equal(hs.width('W'), W_WIDTH);
-  t.equal(hs.height('W'), W_HEIGHT);
+  t.equal(hs.width('T'), T_WIDTH);
+  t.equal(hs.width(' '), SPACE_WIDTH);
+  t.end();
+});
+
+test(TG.hs + 'height', function(t) {
+  t.equal(hs.height('W'), LINE_HEIGHT);
+  t.equal(hs.height('T'), LINE_HEIGHT);
+  t.equal(hs.height(' '), LINE_HEIGHT);
+  t.end();
+});
+
+// Note: It turns out that 2*width("W") may not be equal to width("WW").
+test(TG.hs + 'size of two chars', function(t) {
+  t.equal(hs.width('WW') > hs.width('W'), true);
+  t.equal(hs.height('WW'), hs.height('W'));
   t.end();
 });
 

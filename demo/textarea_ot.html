@@ -2,24 +2,14 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>{{.Name}}</title>
+    <title>TextAreaEditor</title>
     <link rel="stylesheet" href="common.css">
-    <link rel="icon" href="http://www.google.com/favicon.ico">
   </head>
   <body data-ws-url="{{.Socket}}">
-    <h1>{{.Name}}</h1>
-
+    <h1>TextAreaEditor</h1>
     <textarea id="ed1" rows="10" cols="50"></textarea>
     <br>
     <textarea id="ed2" rows="10" cols="50"></textarea>
-
-    <!-- TODO: Use browserify. -->
-    <script src="../util.js"></script>
-    <script src="../events.js"></script>
-    <script src="../textarea_editor.js"></script>
-
-    <script src="../ot_text.js"></script>
-    <script src="../ot.js"></script>
     <script src="textarea_ot.js"></script>
   </body>
 </html>
