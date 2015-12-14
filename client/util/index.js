@@ -1,5 +1,3 @@
-// Common utility functions.
-
 'use strict';
 
 exports.isAlphaNum = function(s) {

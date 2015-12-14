@@ -20,6 +20,7 @@
 var _ = require('lodash');
 var inherits = require('inherits');
 
+var constants = require('./constants');
 var EditorInterface = require('./editor');
 var HtmlSizer = require('./html_sizer');
 var LocalModel = require('./local_model');
@@ -29,14 +30,10 @@ inherits(Editor, EditorInterface);
 module.exports = Editor;
 
 var DEBUG = 0;
-var DEFAULT_STYLE = {
-  boxSizing: 'border-box',
-  webkitUserSelect: 'none'
-};
 
 function createDiv(style) {
   var el = document.createElement('div');
-  _.assign(el.style, DEFAULT_STYLE, style);
+  _.assign(el.style, constants.baseStyle, style);
   return el;
 }
 
@@ -99,18 +96,11 @@ Cursor.prototype.move = function(left, bottom, height) {
 function Editor(el, model) {
   EditorInterface.call(this);
   this.el_ = el;
-  this.reset(model);
 
   // TODO: Use shadow DOM.
-  _.assign(this.el_.style, DEFAULT_STYLE, {
-    border: '1px solid #c0c0c0',
-    padding: '8px',
-    width: '600px',
-    height: '200px',
-    background: '#fff',
-    font: '400 16px/1 Arial, sans-serif',
-    overflowY: 'scroll'
-  });
+  _.assign(this.el_.style, constants.editorStyle);
+
+  this.reset(model);
 
   // Register input handlers.
   // TODO: Provide some way to remove these document event handlers.
@@ -124,7 +114,7 @@ function Editor(el, model) {
 Editor.prototype.reset = function(model) {
   // Remove any existing children, then add HtmlSizer.
   while (this.el_.firstChild) this.el_.removeChild(this.el_.firstChild);
-  this.hs_ = new HtmlSizer(this.el_, DEFAULT_STYLE);
+  this.hs_ = new HtmlSizer(this.el_, constants.baseStyle);
 
   this.m_ = model || new LocalModel();
 

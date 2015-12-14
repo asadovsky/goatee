@@ -24,5 +24,6 @@
   "node": true,
 
   "globals": {
+    "goatee": false
   }
 }

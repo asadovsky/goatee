@@ -1,8 +1,3 @@
-# Next
-
-- Build editor and ot packages
-- Update demos to consume packages
-
 # General
 
 - Use ES2015 via https://babeljs.io/

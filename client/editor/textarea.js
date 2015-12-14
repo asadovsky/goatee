@@ -6,11 +6,13 @@
 
 'use strict';
 
+var _ = require('lodash');
 var inherits = require('inherits');
 
+var constants = require('./constants');
 var EditorInterface = require('./editor');
 var LocalModel = require('./local_model');
-var util = require('./util');
+var util = require('../util');
 
 inherits(Editor, EditorInterface);
 module.exports = Editor;
@@ -21,18 +23,39 @@ module.exports = Editor;
 function Editor(el, model) {
   EditorInterface.call(this);
   this.el_ = el;
+
+  _.assign(this.el_.style, constants.editorStyle, {
+    padding: '0',
+    overflowY: 'hidden'
+  });
+
+  this.ta_ = document.createElement('textarea');
+  _.assign(this.ta_.style, constants.baseStyle, {
+    display: 'block',
+    margin: '0',
+    border: '0',
+    padding: constants.editorStyle.padding,
+    width: '100%',
+    height: '100%',
+    font: constants.editorStyle.font,
+    lineHeight: '1.2',
+    outline: 'none',
+    resize: 'none'
+  });
+  this.el_.appendChild(this.ta_);
+
   this.reset(model);
 
   // Register input handlers. Use 'input' event to catch text mutations, and
   // various other events to catch selection mutations.
-  this.el_.addEventListener('input', this.handleInput_.bind(this));
+  this.ta_.addEventListener('input', this.handleInput_.bind(this));
 
   var handler = this.updateSelection_.bind(this);
-  this.el_.addEventListener('input', handler);
-  this.el_.addEventListener('keydown', handler);
-  this.el_.addEventListener('mousedown', handler);
-  this.el_.addEventListener('mousemove', handler);
-  this.el_.addEventListener('select', handler);
+  this.ta_.addEventListener('input', handler);
+  this.ta_.addEventListener('keydown', handler);
+  this.ta_.addEventListener('mousedown', handler);
+  this.ta_.addEventListener('mousemove', handler);
+  this.ta_.addEventListener('select', handler);
 }
 
 Editor.prototype.reset = function(model) {
@@ -44,7 +67,7 @@ Editor.prototype.reset = function(model) {
   this.m_.on('deleteText', handler);
 
   // Handle non-empty initial model state.
-  this.el_.value = this.m_.getText();
+  this.ta_.value = this.m_.getText();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -52,11 +75,11 @@ Editor.prototype.reset = function(model) {
 
 Editor.prototype.handleModifyText_ = function(e) {
   if (e.isLocal) return;
-  this.el_.value = this.m_.getText();
+  this.ta_.value = this.m_.getText();
   // If this editor has focus, update its selection/cursor position.
-  if (document.activeElement === this.el_) {
+  if (document.activeElement === this.ta_) {
     var selRange = this.m_.getSelectionRange();
-    this.el_.setSelectionRange(Math.min(selRange[0], selRange[1]),
+    this.ta_.setSelectionRange(Math.min(selRange[0], selRange[1]),
                                Math.max(selRange[0], selRange[1]));
   }
 };
@@ -66,7 +89,7 @@ Editor.prototype.handleModifyText_ = function(e) {
 
 Editor.prototype.handleInput_ = function(e) {
   var oldText = this.m_.getText();
-  var newText = util.canonicalizeLineBreaks(this.el_.value);
+  var newText = util.canonicalizeLineBreaks(this.ta_.value);
 
   // Note, oldText may be equal to newText, e.g. if user selects all, then
   // copies, then pastes.

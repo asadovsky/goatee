@@ -13,6 +13,7 @@
 
 var test = require('tape');
 
+var constants = require('../constants');
 var GoateeEditor = require('../goatee');
 var HtmlSizer = require('../html_sizer');
 var util = require('../../util');
@@ -851,10 +852,8 @@ test(TG.ks + 'change selection, then paste', function(t) {
 
 var LINE_HEIGHT = 16;
 
-var hs = new HtmlSizer(document.body, {
-  boxSizing: 'border-box',
-  webkitUserSelect: 'none',
-  font: '400 16px/1 Arial, sans-serif'
+var hs = new HtmlSizer(document.body, constants.baseStyle, {
+  font: constants.editorStyle.font
 });
 
 test(TG.hs + 'size of one char', function(t) {

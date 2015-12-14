@@ -4,5 +4,8 @@ Exploration of collaborative editing algorithms.
 
 ## Development
 
+    GOPATH=~/dev/go go test github.com/asadovsky/goatee/...
+    GOPATH=~/dev/go go vet github.com/asadovsky/goatee/...
+
     GOPATH=~/dev/go go install github.com/asadovsky/goatee/...
-    GOPATH=~/dev/go ~/dev/go/bin/otserver
+    ~/dev/go/bin/server
