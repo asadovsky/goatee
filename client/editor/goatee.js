@@ -60,7 +60,6 @@ function Cursor() {
     position: 'absolute',
     width: '2px',
     backgroundColor: '#000',
-    borderBottom: '3px solid #fff',
     zIndex: '2'
   });
 
@@ -192,7 +191,7 @@ Editor.prototype.handleInsertText_ = function(e) {
   var valueCharSizes = new Array(e.value.length);
   for (var i = 0; i < e.value.length; i++) {
     var c = e.value.charAt(i);
-    valueCharSizes[i] = this.hs_.size(this.makeLineHtml_(c, e.pos + i));
+    valueCharSizes[i] = this.charSize_(c, e.pos + i);
   }
   this.charSizes_ = this.charSizes_.slice(0, e.pos).concat(
     valueCharSizes, this.charSizes_.slice(e.pos));
@@ -212,12 +211,27 @@ Editor.prototype.handleSetSelectionRange_ = function(e) {
 ////////////////////////////////////////////////////////////////////////////////
 // Utility methods
 
+Editor.prototype.charSize_ = function(c, p) {
+  // Note: It turns out that n*width(c) may not be equal to width(c.repeat(n)),
+  // so we compute char width as width(c.repeat(n))/n, where n=8.
+  var n = 8;
+  var width = this.hs_.width(this.makeLineHtml_(c.repeat(n), p));
+  // Compute height(c), not height(c.repeat(n)), since c could be a newline
+  // character.
+  var height = this.hs_.height(this.makeLineHtml_(c, p));
+  return [width / n, height];
+};
+
+Editor.prototype.lineHeight_ = function(p) {
+  return this.hs_.height(this.makeLineHtml_(' ', p));
+};
+
 Editor.prototype.initCharSizes_ = function() {
   var text = this.m_.getText();
   this.charSizes_ = new Array(text.length);
-  for (var i = 0; i < text.length; i++) {
-    var c = text.charAt(i);
-    this.charSizes_[i] = this.hs_.size(this.makeLineHtml_(c, i));
+  for (var p = 0; p < text.length; p++) {
+    var c = text.charAt(p);
+    this.charSizes_[p] = this.charSize_(c, p);
   }
 };
 
@@ -321,12 +335,13 @@ Editor.prototype.setSelectionFromRowAndX_ = function(row, x, updateSelStart, cle
 // styling (e.g. bold).
 // TODO: Switch to returning an Element object.
 Editor.prototype.makeLineHtml_ = function(text, p) {
+  // Note, selection elements are added as children of lineEl.
   var lineEl = createDiv({
-    position: 'relative',
-    minHeight: '19px'  // editor font-size + cursor border-bottom
+    position: 'relative'
   });
   var lineInnerEl = createDiv({
-    position: 'relative',
+    position: 'relative',  // needed for zIndex
+    padding: '2px 0 1px',
     whiteSpace: 'pre',
     zIndex: '1'
   });
@@ -529,7 +544,11 @@ Editor.prototype.renderAll_ = function(updateScroll) {
   // Compute lineYOffsets.
   var numRows = this.linePOffsets_.length;
   var beginPx = 0;
-  var emptyLineHeight = this.hs_.height(this.makeLineHtml_('', p));
+  // The first and only line of an empty document, and the last line of any
+  // document that ends in a newline character, contains zero characters, but a
+  // cursor positioned at the start of such a line should still have non-zero
+  // height.
+  var emptyLineHeight = this.lineHeight_(p);
   this.lineYOffsets_ = new Array(numRows);
   for (row = 0; row < numRows; row++) {
     var lineHeight = emptyLineHeight;

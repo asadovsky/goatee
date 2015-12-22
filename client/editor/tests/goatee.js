@@ -25,10 +25,14 @@ var ed = new GoateeEditor(document.querySelector('#ed'));
 ed.el_.style.width = '580px';
 ed.el_.style.overflowY = 'hidden';
 
+function charWidth(c) {
+  return ed.charSize_(c, 0)[0];
+}
+
 // Widths of various characters.
-var W_WIDTH = 15.109375;
-var SPACE_WIDTH = 4.453125;
-var T_WIDTH = 9.78125;
+var W_WIDTH = charWidth('W');
+var T_WIDTH = charWidth('T');
+var SPACE_WIDTH = charWidth(' ');
 
 // Maps key name to character code.
 var KEY_CODES = {
@@ -691,43 +695,60 @@ test(TG.rbs + 'up/down with wrapped line', function(t) {
   end(t);
 });
 
-// TODO: Broken due to fractional widths.
-test.skip(TG.rbs + 'up/down with chars of different widths', function(t) {
+test(TG.rbs + 'up/down with chars of different widths', function(t) {
+  var FAKE_W_WIDTH = 15, FAKE_T_WIDTH = 10, FAKE_SPACE_WIDTH = 4;
+  // Inject a fake Editor.charSize_ method.
+  var oldCharSize = ed.charSize_.bind(ed);
+  ed.charSize_ = function(c, p) {
+    switch (c) {
+    case 'W':
+      return [FAKE_W_WIDTH, oldCharSize(c, p)[1]];
+    case 'T':
+      return [FAKE_T_WIDTH, oldCharSize(c, p)[1]];
+    case ' ':
+      return [FAKE_SPACE_WIDTH, oldCharSize(c, p)[1]];
+    default:
+      t.equal(c, '\n');
+      return oldCharSize(c, p);
+    }
+  };
   type('W\nTT\nW \nTW\n    \nW\n');
   // This test relies on the following invariants.
-  t.equal(T_WIDTH * 1.5, W_WIDTH);
-  t.equal(SPACE_WIDTH * 2.5, T_WIDTH);
+  t.equal(charWidth('T') * 1.5, charWidth('W'));
+  t.equal(charWidth(' ') * 2.5, charWidth('T'));
   // Initial cursor left is 0px.
   t.deepEqual(cursorState(), [18, 6, 0]);
   fireKeyDownSeq('up');
   t.deepEqual(cursorState(), [16, 5, 0]);
   fireKeyDownSeq('end');
   // Now, cursor left is 15px.
-  t.deepEqual(cursorState(), [17, 5, W_WIDTH]);
+  t.deepEqual(cursorState(), [17, 5, FAKE_W_WIDTH]);
   fireKeyDownSeq('up');
   // 16px is closer than 12px.
-  t.deepEqual(cursorState(), [15, 4, 4 * SPACE_WIDTH]);
+  t.deepEqual(cursorState(), [15, 4, 4 * FAKE_SPACE_WIDTH]);
   fireKeyDownSeq('up');
   // 10px is closer than 25px.
-  t.deepEqual(cursorState(), [9, 3, T_WIDTH]);
+  t.deepEqual(cursorState(), [9, 3, FAKE_T_WIDTH]);
   fireKeyDownSeq('down');
-  // prevLeft should still be 15px (i.e. W_WIDTH).
-  t.deepEqual(cursorState(), [15, 4, 4 * SPACE_WIDTH]);
+  // prevLeft should still be 15px (i.e. FAKE_W_WIDTH).
+  t.deepEqual(cursorState(), [15, 4, 4 * FAKE_SPACE_WIDTH]);
   fireKeyDownSeq('up up');
-  t.deepEqual(cursorState(), [6, 2, W_WIDTH]);
+  t.deepEqual(cursorState(), [6, 2, FAKE_W_WIDTH]);
   fireKeyDownSeq('up');
-  // 10px is closer than 20px (lower number wins ties).
-  t.deepEqual(cursorState(), [3, 1, T_WIDTH]);
+  // 10px is closer than 20px (smaller numbers win tiebreaks).
+  t.deepEqual(cursorState(), [3, 1, FAKE_T_WIDTH]);
   fireKeyDownSeq('up');
-  t.deepEqual(cursorState(), [1, 0, W_WIDTH]);
+  t.deepEqual(cursorState(), [1, 0, FAKE_W_WIDTH]);
   fireKeyDownSeq('down home right down');
-  t.deepEqual(cursorState(), [6, 2, W_WIDTH]);
+  t.deepEqual(cursorState(), [6, 2, FAKE_W_WIDTH]);
   fireKeyDownSeq('down down');
-  // This time, prevLeft is 10px (i.e. T_WIDTH).
+  // This time, prevLeft is 10px (i.e. FAKE_T_WIDTH).
   // 8px is closer than 12px (lower number wins ties).
-  t.deepEqual(cursorState(), [13, 4, 2 * SPACE_WIDTH]);
+  t.deepEqual(cursorState(), [13, 4, 2 * FAKE_SPACE_WIDTH]);
   fireKeyDownSeq('down down down');
   t.deepEqual(cursorState(), [18, 6, 0]);
+  // Restore the real Editor.charSize_ method.
+  ed.charSize_ = oldCharSize;
   end(t);
 });
 
@@ -857,17 +878,14 @@ var hs = new HtmlSizer(document.body, _.assign({}, constants.baseStyle, {
   font: constants.editorStyle.font
 }));
 
-test(TG.hs + 'size of one char', function(t) {
-  t.deepEqual(hs.size('W'), [W_WIDTH, LINE_HEIGHT]);
-  t.deepEqual(hs.size('T'), [T_WIDTH, LINE_HEIGHT]);
-  t.deepEqual(hs.size(' '), [SPACE_WIDTH, LINE_HEIGHT]);
-  t.end();
-});
+function approxEqual(t, a, b) {
+  t.ok(Math.abs(a - b) < 0.05);
+}
 
 test(TG.hs + 'width', function(t) {
-  t.equal(hs.width('W'), W_WIDTH);
-  t.equal(hs.width('T'), T_WIDTH);
-  t.equal(hs.width(' '), SPACE_WIDTH);
+  approxEqual(t, hs.width('W'), W_WIDTH);
+  approxEqual(t, hs.width('T'), T_WIDTH);
+  approxEqual(t, hs.width(' '), SPACE_WIDTH);
   t.end();
 });
 
@@ -878,9 +896,15 @@ test(TG.hs + 'height', function(t) {
   t.end();
 });
 
-// Note: It turns out that 2*width("W") may not be equal to width("WW").
-test(TG.hs + 'size of two chars', function(t) {
-  t.equal(hs.width('WW') > hs.width('W'), true);
+test(TG.hs + 'size', function(t) {
+  t.deepEqual(hs.size('W'), [hs.width('W'), hs.height('W')]);
+  t.deepEqual(hs.size('foo'), [hs.width('foo'), hs.height('foo')]);
+  t.end();
+});
+
+// Note: It turns out that n*width(c) may not be equal to width(c.repeat(n)).
+test(TG.hs + 'two chars', function(t) {
+  t.ok(hs.width('WW') > hs.width('W'));
   t.equal(hs.height('WW'), hs.height('W'));
   t.end();
 });
