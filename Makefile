@@ -1,5 +1,6 @@
 SHELL := /bin/bash -euo pipefail
 PATH := node_modules/.bin:$(PATH)
+GOPATH := $(HOME)/dev/go
 
 define BROWSERIFY
 	@mkdir -p $(dir $2)
@@ -15,19 +16,32 @@ endef
 
 all: build
 
+.PHONY: build
+
 node_modules: package.json
 	npm prune
 	npm install
 	touch $@
 
+build: dist/editor.min.js
 dist/editor.min.js: client/editor/index.js $(shell find client) node_modules
 	$(call BROWSERIFY_STANDALONE,$<,$@,editor)
 
+build: dist/ot.min.js
 dist/ot.min.js: client/ot/index.js $(shell find client) node_modules
 	$(call BROWSERIFY_STANDALONE,$<,$@,ot)
 
-.PHONY: build
-build: dist/editor.min.js dist/ot.min.js
+build: dist/demo.min.js
+dist/demo.min.js: demo/index.js node_modules
+	$(call BROWSERIFY,$<,$@)
+
+build: dist/demo
+dist/demo: $(shell find demo server)
+	go build -o $@ github.com/asadovsky/goatee/demo
+
+build: dist/server
+dist/server: $(shell find server)
+	go build -o $@ github.com/asadovsky/goatee/server
 
 ########################################
 # Demos
@@ -35,6 +49,10 @@ build: dist/editor.min.js dist/ot.min.js
 .PHONY: demo-local
 demo-local: build
 	open file://$(shell pwd)/demo/goatee_local.html
+
+.PHONY: demo-ot
+demo-ot: build
+	dist/demo -port=4000
 
 ########################################
 # Test, clean, and lint

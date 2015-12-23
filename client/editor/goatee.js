@@ -110,6 +110,9 @@ function Editor(el, model) {
   document.addEventListener('mouseup', this.handleMouseUp_.bind(this));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Public methods
+
 Editor.prototype.reset = function(model) {
   // Remove any existing children, then add HtmlSizer.
   while (this.el_.firstChild) this.el_.removeChild(this.el_.firstChild);
@@ -162,9 +165,6 @@ Editor.prototype.reset = function(model) {
   this.initCharSizes_();
   this.renderAll_(true);
 };
-
-////////////////////////////////////////////////////////////////////////////////
-// Public methods
 
 Editor.prototype.focus = function() {
   this.hasFocus_ = true;

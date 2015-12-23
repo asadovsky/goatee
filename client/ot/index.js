@@ -8,9 +8,9 @@
 var Document = require('./document');
 
 // Similar to gapi.drive.realtime.load.
-function load(docId, onDocLoaded) {
+function load(addr, docId, onDocLoaded) {
   /* jshint nonew: false */
-  new Document(onDocLoaded);
+  new Document(addr, docId, onDocLoaded);
 }
 
 module.exports = {

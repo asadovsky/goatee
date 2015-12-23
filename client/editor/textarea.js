@@ -58,6 +58,9 @@ function Editor(el, model) {
   this.ta_.addEventListener('select', handler);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Public methods
+
 Editor.prototype.reset = function(model) {
   this.m_ = model || new LocalModel();
 
@@ -68,6 +71,22 @@ Editor.prototype.reset = function(model) {
 
   // Handle non-empty initial model state.
   this.ta_.value = this.m_.getText();
+};
+
+Editor.prototype.focus = function() {
+  this.ta_.focus();
+};
+
+Editor.prototype.blur = function() {
+  this.ta_.blur();
+};
+
+Editor.prototype.getText = function() {
+  return this.m_.getText();
+};
+
+Editor.prototype.getSelectionRange = function() {
+  return this.m_.getSelectionRange();
 };
 
 ////////////////////////////////////////////////////////////////////////////////

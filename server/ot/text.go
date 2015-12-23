@@ -1,4 +1,4 @@
-package main
+package ot
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ type Op interface {
 func OpFromString(s string) (Op, error) {
 	colon := strings.Index(s, ":")
 	if colon == -1 {
-		return nil, errors.New(fmt.Sprintf("Failed to parse operation %q", s))
+		return nil, fmt.Errorf("Failed to parse operation %q", s)
 	}
 	pos, err := strconv.Atoi(s[1:colon])
 	if err != nil {
@@ -30,7 +30,7 @@ func OpFromString(s string) (Op, error) {
 		}
 		return &Delete{pos, length}, nil
 	}
-	return nil, errors.New(fmt.Sprintf("Unknown operation %q", s[0]))
+	return nil, fmt.Errorf("Unknown operation %q", s[0])
 }
 
 func OpsFromStrings(strs []string) ([]Op, error) {
@@ -115,9 +115,9 @@ func Transform(a, b Op) (ap, bp Op) {
 				return &Delete{ai.Pos - bi.Len, ai.Len}, b
 			}
 			// Deletions overlap.
-			pos := MinInt(ai.Pos, bi.Pos)
-			overlap := MaxInt(0, MinInt(aEnd, bEnd)-MaxInt(ai.Pos, bi.Pos))
-			Assert(overlap > 0)
+			pos := minInt(ai.Pos, bi.Pos)
+			overlap := maxInt(0, minInt(aEnd, bEnd)-maxInt(ai.Pos, bi.Pos))
+			assert(overlap > 0)
 			return &Delete{pos, ai.Len - overlap}, &Delete{pos, bi.Len - overlap}
 		}
 	}
@@ -157,7 +157,7 @@ func (t *Text) Apply(op Op) error {
 		}
 		t.Value = t.Value[0:op.Pos] + t.Value[op.Pos+op.Len:]
 	default:
-		return errors.New(fmt.Sprintf("Unexpected operation type %T", t))
+		return fmt.Errorf("Unexpected operation type %T", t)
 	}
 	return nil
 }
@@ -169,4 +169,21 @@ func (t *Text) ApplyCompound(ops []Op) error {
 		}
 	}
 	return nil
+}
+
+////////////////////////////////////////
+// Internal helpers
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

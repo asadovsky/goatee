@@ -15,11 +15,13 @@ var text = require('./text');
 var DEBUG_DELAY = 0;
 var DEBUG_SOCKET = false;
 
+module.exports = Document;
+
 // Similar to gapi.drive.realtime.Document.
-function Document(onDocLoaded) {
+function Document(addr, docId, onDocLoaded) {
   // Initialized by NewClient message from server.
   this.clientId_ = null;
-  this.baseTxnId_ = null;  // last transaction we've gotten from server
+  this.baseCopId_ = null;  // last compound op we've gotten from server
 
   // The most recent clientOps index sent to and acknowledged by the server.
   this.sentClientOpIdx_ = -1;
@@ -29,8 +31,7 @@ function Document(onDocLoaded) {
   // starts at clientOps[ackedClientOpIdx] + 1.
   this.clientOps_ = [];
 
-  var dataWsUrl = document.body.getAttribute('data-ws-url');
-  this.socket_ = new WebSocket(dataWsUrl);
+  this.socket_ = new WebSocket('ws://' + addr);
   this.model_ = null;  // initialized in socket.onmessage
 
   this.socket_.onclose = (function(event) {
@@ -38,24 +39,24 @@ function Document(onDocLoaded) {
   }).bind(this);
 
   this.socket_.onmessage = (function(event) {
-    if (DEBUG_SOCKET) console.log('socket.receive ' + event.data);
+    if (DEBUG_SOCKET) console.log('socket.recv ' + event.data);
     var msg = JSON.parse(event.data);
     // TODO: Implement better way to detect message type.
     if (msg.hasOwnProperty('Text')) {  // msg type NewClient
       console.assert(this.clientId_ === null);
       this.clientId_ = msg['ClientId'];
-      this.baseTxnId_ = parseInt(msg['BaseTxnId']);
+      this.baseCopId_ = parseInt(msg['BaseCopId']);
       this.model_ = new Model(this, msg['Text']);
       onDocLoaded(this);
       return;
     }
 
-    console.assert(msg.hasOwnProperty('TxnId'));  // msg type Broadcast
-    var newBaseTxnId = parseInt(msg['TxnId']);
-    console.assert(newBaseTxnId === this.baseTxnId_ + 1);
-    this.baseTxnId_ = newBaseTxnId;
+    console.assert(msg.hasOwnProperty('CopId'));  // msg type Broadcast
+    var newBaseCopId = parseInt(msg['CopId']);
+    console.assert(newBaseCopId === this.baseCopId_ + 1);
+    this.baseCopId_ = newBaseCopId;
 
-    // If txn is from this client, send all buffered ops to server.
+    // If the compound op is from this client, send all buffered ops to server.
     // Otherwise, transform it against all buffered ops and then apply it.
     if (msg['ClientId'] === this.clientId_) {
       this.ackedClientOpIdx_ = this.sentClientOpIdx_;
@@ -95,7 +96,7 @@ Document.prototype.sendBufferedOps_ = function() {
     OpStrs: text.opsToStrings(
       this.clientOps_.slice(this.ackedClientOpIdx_ + 1)),
     ClientId: this.clientId_,
-    BaseTxnId: this.baseTxnId_
+    BaseCopId: this.baseCopId_
   };
   var send = (function() {
     var json = JSON.stringify(msg);
