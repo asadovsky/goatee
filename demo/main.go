@@ -3,12 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/asadovsky/goatee/server/ot"
 	"github.com/asadovsky/gosh"
 )
+
+const httpAddr = "localhost:8080"
 
 var (
 	port    = flag.Int("port", 0, "")
@@ -28,6 +32,8 @@ func main() {
 	c := sh.Fn(serveFn, addr)
 	c.Start()
 	c.AwaitReady()
-	fmt.Printf("file://%s/demo/index.html?mode=ot&addr=%s\n", cwd, url.QueryEscape(addr))
+	// Note, the "open" command doesn't support query strings in file urls.
+	fmt.Printf("http://%s/demo/index.html?mode=ot&addr=%s\n", httpAddr, url.QueryEscape(addr))
+	http.ListenAndServe(httpAddr, http.FileServer(http.Dir(filepath.Join(cwd))))
 	c.Wait()
 }
