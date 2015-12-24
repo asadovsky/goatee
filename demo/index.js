@@ -22,19 +22,14 @@ var Editor = React.createFactory(React.createClass({
   displayName: 'Editor',
   componentDidMount: function() {
     var that = this, el = ReactDOM.findDOMNode(this);
-    function maybeFocus() {
-      if (that.props.focus) {
-        el.focus();
-      }
-    }
     if (this.props.mode === 'local') {
-      newEditor(el, this.props.type);
-      maybeFocus();
+      var ed = newEditor(el, this.props.type);
+      if (that.props.focus) ed.focus();
     } else {
       console.assert(this.props.mode === 'ot');
       goatee.ot.load(this.props.addr, 0, function(doc) {
-        newEditor(el, that.props.type, doc.getModel());
-        maybeFocus();
+        var ed = newEditor(el, that.props.type, doc.getModel());
+        if (that.props.focus) ed.focus();
       });
     }
   },

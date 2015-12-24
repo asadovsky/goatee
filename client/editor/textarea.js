@@ -54,12 +54,7 @@ function Editor(el, model) {
   this.ta_.addEventListener('mousedown', handler);
   this.ta_.addEventListener('mousemove', handler);
   this.ta_.addEventListener('select', handler);
-
-  // Handle focus and blur events, setting useCapture=true.
-  this.el_.tabIndex = '0';
-  this.el_.addEventListener('focus', this.handleFocus_.bind(this), true);
-  this.el_.addEventListener('blur', this.handleBlur_.bind(this), true);
-  window.addEventListener('blur', this.handleBlur_.bind(this));
+  window.addEventListener('blur', this.blur.bind(this));
 
   this.reset(model);
 }
@@ -77,6 +72,14 @@ Editor.prototype.reset = function(model) {
 
   // Handle non-empty initial model state.
   this.ta_.value = this.m_.getText();
+};
+
+Editor.prototype.focus = function() {
+  this.ta_.focus();
+};
+
+Editor.prototype.blur = function() {
+  this.ta_.blur();
 };
 
 Editor.prototype.getText = function() {
@@ -123,14 +126,6 @@ Editor.prototype.handleInput_ = function(e) {
 
   if (insertLen > 0) this.m_.insertText(l, newText.substr(l, insertLen));
   if (deleteLen > 0) this.m_.deleteText(l, deleteLen);
-};
-
-Editor.prototype.handleFocus_ = function() {
-  this.ta_.focus();
-};
-
-Editor.prototype.handleBlur_ = function() {
-  this.ta_.blur();
 };
 
 Editor.prototype.updateSelection_ = function() {

@@ -105,12 +105,7 @@ function Editor(el, model) {
   document.addEventListener('keydown', this.handleKeyDown_.bind(this));
   document.addEventListener('mousedown', this.handleMouseDown_.bind(this));
   document.addEventListener('mouseup', this.handleMouseUp_.bind(this));
-
-  // Handle focus and blur events, setting useCapture=true.
-  this.el_.tabIndex = '0';
-  this.el_.addEventListener('focus', this.handleFocus_.bind(this), true);
-  this.el_.addEventListener('blur', this.handleBlur_.bind(this), true);
-  window.addEventListener('blur', this.handleBlur_.bind(this));
+  window.addEventListener('blur', this.blur.bind(this));
 
   this.reset(model);
 }
@@ -168,6 +163,16 @@ Editor.prototype.reset = function(model) {
   // Initialize charSizes_ to handle non-empty initial model state.
   this.initCharSizes_();
   this.renderAll_(true);
+};
+
+Editor.prototype.focus = function() {
+  this.hasFocus_ = true;
+  this.renderSelection_(false);
+};
+
+Editor.prototype.blur = function() {
+  this.hasFocus_ = false;
+  this.renderSelection_(false);
 };
 
 Editor.prototype.getText = function() {
@@ -742,14 +747,4 @@ Editor.prototype.handleMouseMove_ = function(e) {
   var x = e.clientX - innerRect.left;
   var y = e.clientY - innerRect.top;
   this.setSelectionFromRowAndX_(this.rowFromY_(y), x, false, true);
-};
-
-Editor.prototype.handleFocus_ = function() {
-  this.hasFocus_ = true;
-  this.renderSelection_(false);
-};
-
-Editor.prototype.handleBlur_ = function() {
-  this.hasFocus_ = false;
-  this.renderSelection_(false);
 };
