@@ -1,20 +1,30 @@
-# General
+# CRDT
 
-- Use ES2015 via https://babeljs.io/
+### p0
 
-# Editor
+- Implement register, counter, map
+- Implement string (e.g. Treedoc or Logoot)
 
-- Add Quill-backed editor (http://quilljs.com/)
-- Add more tests
-- Set up Travis (http://travis-ci.org/)
-- See TODOs in goatee.js
-- Better separate model from view
-- Keep track of model updates since last render, so that render can know which
-  parts of view to update
+### p1
+
+- Discovery setup
+- Implement list
 
 # OT
 
+### p1
+
 - Support cursors and selections
+
+### p2
+
 - Support undo/redo
-- Support offline editing (i.e. if WebSocket closes)
-- Fix edge cases, e.g. handle non-ASCII chars
+- Support offline editing
+- Handle non-ASCII chars
+
+# General
+
+### p2
+
+- Use ES2015 (https://babeljs.io/)
+- Add Quill-backed editor (http://quilljs.com/)
