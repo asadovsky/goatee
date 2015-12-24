@@ -66,8 +66,7 @@ function transformInsertDelete(a, b) {
   if (a.pos <= b.pos) {
     return [a, new Delete(b.pos + a.value.length, b.len)];
   } else if (a.pos < b.pos + b.len) {
-    return [new Insert(b.pos, ''),
-            new Delete(b.pos, b.len + a.value.length)];
+    return [new Insert(b.pos, ''), new Delete(b.pos, b.len + a.value.length)];
   } else {
     return [new Insert(a.pos - b.len, a.value), b];
   }
