@@ -18,7 +18,7 @@ var (
 func main() {
 	gosh.MaybeRunFnAndExit()
 	flag.Parse()
-	sh := gosh.NewShell(gosh.Opts{PropagateChildOutput: true})
+	sh := gosh.NewShell(gosh.Opts{})
 	defer sh.Cleanup()
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -28,6 +28,6 @@ func main() {
 	c := sh.Fn(serveFn, addr)
 	c.Start()
 	c.AwaitReady()
-	fmt.Printf("file://%s/demo/goatee_ot.html?addr=%s\n", cwd, url.QueryEscape(addr))
+	fmt.Printf("file://%s/demo/index.html?mode=ot&addr=%s\n", cwd, url.QueryEscape(addr))
 	c.Wait()
 }

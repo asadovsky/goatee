@@ -128,7 +128,8 @@ function repeat(s, n) {
 
 function resetEditor() {
   ed.reset();
-  ed.focus();
+  // Call ed.handleFocus_, not ed.el_.focus, since the latter is async.
+  ed.handleFocus_();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

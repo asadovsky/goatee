@@ -48,11 +48,11 @@ dist/server: $(shell find server)
 
 .PHONY: demo-local
 demo-local: build
-	open file://$(shell pwd)/demo/goatee_local.html
+	open file://$(shell pwd)/demo/index.html
 
 .PHONY: demo-ot
 demo-ot: build
-	dist/demo -port=4000
+	dist/demo -port=4000 | xargs -n 1 -t open
 
 ########################################
 # Test, clean, and lint

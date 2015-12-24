@@ -16,5 +16,6 @@ exports.editorStyle = _.assign({}, exports.baseStyle, {
   height: '200px',
   background: '#fff',
   font: '400 16px/1 Arial, sans-serif',
-  overflowY: 'scroll'
+  overflowY: 'scroll',
+  outline: 'none'
 });
