@@ -153,7 +153,6 @@ Editor.prototype.reset = function(model) {
     minHeight: '100%',
     cursor: 'text'
   });
-  this.innerEl_.className = 'editor-inner';
   this.innerEl_.appendChild(this.textEl_);
   this.innerEl_.appendChild(this.cursor_.el_);
   this.el_.appendChild(this.innerEl_);
