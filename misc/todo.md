@@ -2,13 +2,13 @@
 
 ### p0
 
-- Implement register, counter, map
-- Implement string (e.g. Treedoc or Logoot)
+- Implement basic types, e.g. LWW-Register, PN-Counter, OR-Set, 2P2P-Graph
+- Implement string type, e.g. Treedoc or Logoot
 
 ### p1
 
 - Discovery setup
-- Implement list
+- Implement list type
 
 # OT
 

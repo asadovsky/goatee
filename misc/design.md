@@ -1,0 +1,47 @@
+# Client
+
+- JS widgets for counter, register, set, etc.
+- WebSocket protocol: client connects to server, sends object ID to initialize
+  the stream; from then on, client sends and receives type-specific ops
+- Client messages specify base op id; server messages specify op id
+- Client either disallows or buffers ops not parented off server state
+- Key question for real-time text editing: is unidirectional data flow fast
+  enough? With current Vanadium RPC performance, the answer is probably "no".
+  And if the answer is "no", we need client-side OT or CRDT.
+
+### Undo/redo, assuming unidirectional data flow
+
+- Server messages specify opId
+- Client can do undoId := undo(opId) and redo(undoId)
+- Client lib hides the undo/redo stack
+
+# Server
+
+- Probably want a hybrid of state-based and op-based, where we transmit
+  per-object deltas (relative to some genvector) on the wire but maintain a
+  notion of "current state" at each node
+
+### State-based
+
+- Store, and every object inside of it, has an associated genvector
+- Initiator sends its current genvector; responder sends current state for all
+  out-of-date objects
+- Note, this is at odds with local client-server OT, since we won't know how to
+  transform the client ops (unless we retain state history at the server and can
+  compute a "delta compound op" between any two states)
+- Alternatively, we could implement client libs that speak CRDT (i.e. subset of
+  sync protocol) with local server, but that seems heavy-weight
+- Note, today's Syncbase objects can be thought of as state-based LWW registers,
+  though for that our DAG bookkeeping is unnecessarily expensive
+
+### Op-based
+
+- More like Syncbase: oplog with keys of the form [devId]:[gen], where the value
+  contains the object id, the position within the local oplog, and some
+  representation of the object value delta (possibly a snapshot)
+- Maintain some representation of "current object state", or state as of some
+  recent oplog position, for fast state materialization
+- May not need to maintain a DAG; it depends on how exactly conflicts get
+  resolved
+- Seems better for supporting undo-redo (?)
+- See http://swarmjs.github.io/articles/2of5/
