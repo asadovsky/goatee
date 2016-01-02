@@ -12,18 +12,17 @@
 var AsyncModel = require('../editor').AsyncModel;
 var text = require('./text');
 
-var DEBUG_DELAY = 0;
-var DEBUG_SOCKET = false;
-
 module.exports = Document;
 
 // Similar to gapi.drive.realtime.Document.
 function Document(addr, docId, onDocLoaded) {
   var that = this;
+  this.socket_ = new WebSocket('ws://' + addr);
 
   // Initialized by NewClient message from server.
   this.clientId_ = null;
   this.baseCopId_ = null;  // last compound op we've gotten from server
+  this.m_ = null;
 
   // The most recent clientOps index sent to and acknowledged by the server.
   this.sentClientOpIdx_ = -1;
@@ -33,18 +32,18 @@ function Document(addr, docId, onDocLoaded) {
   // starts at clientOps[ackedClientOpIdx] + 1.
   this.clientOps_ = [];
 
-  this.socket_ = new WebSocket('ws://' + addr);
-  this.m_ = null;  // initialized in socket.onmessage
-
-  this.socket_.onclose = function(event) {
-    if (DEBUG_SOCKET) console.log('socket.close');
+  this.socket_.onclose = function(e) {
+    if (process.env.DEBUG_SOCKET) {
+      console.log('socket.close');
+    }
   };
 
-  this.socket_.onmessage = function(event) {
-    if (DEBUG_SOCKET) console.log('socket.recv ' + event.data);
-    var msg = JSON.parse(event.data);
-    // TODO: Implement better way to detect message type.
-    if (msg.hasOwnProperty('Text')) {  // msg type NewClient
+  this.socket_.onmessage = function(e) {
+    if (process.env.DEBUG_SOCKET) {
+      console.log('socket.recv ' + e.data);
+    }
+    var msg = JSON.parse(e.data);
+    if (msg['Type'] === 'NewClient') {
       console.assert(that.clientId_ === null);
       that.clientId_ = msg['ClientId'];
       that.baseCopId_ = parseInt(msg['BaseCopId']);
@@ -53,7 +52,7 @@ function Document(addr, docId, onDocLoaded) {
       return;
     }
 
-    console.assert(msg.hasOwnProperty('CopId'));  // msg type Broadcast
+    console.assert(msg['Type'] === 'Broadcast');
     var newBaseCopId = parseInt(msg['CopId']);
     console.assert(newBaseCopId === that.baseCopId_ + 1);
     that.baseCopId_ = newBaseCopId;
@@ -100,6 +99,16 @@ Document.prototype.getModel = function() {
   return this.m_;
 };
 
+Document.prototype.handleInsert = function(pos, value) {
+  this.m_.applyInsert(pos, value);
+  this.pushOp_(new text.Insert(pos, value));
+};
+
+Document.prototype.handleDelete = function(pos, len) {
+  this.m_.applyDelete(pos, len);
+  this.pushOp_(new text.Delete(pos, len));
+};
+
 Document.prototype.sendBufferedOps_ = function() {
   var that = this;
   console.assert(this.sentClientOpIdx_ === this.ackedClientOpIdx_);
@@ -116,24 +125,16 @@ Document.prototype.sendBufferedOps_ = function() {
   };
   var send = function() {
     var json = JSON.stringify(msg);
-    if (DEBUG_SOCKET) console.log('socket.send ' + json);
+    if (process.env.DEBUG_SOCKET) {
+      console.log('socket.send ' + json);
+    }
     that.socket_.send(json);
   };
-  if (DEBUG_DELAY > 0) {
-    window.setTimeout(send, DEBUG_DELAY);
+  if (process.env.DEBUG_DELAY > 0) {
+    window.setTimeout(send, Number(process.env.DEBUG_DELAY));
   } else {
     send();
   }
-};
-
-Document.prototype.handleInsert = function(pos, value) {
-  this.m_.applyInsert(pos, value);
-  this.pushOp_(new text.Insert(pos, value));
-};
-
-Document.prototype.handleDelete = function(pos, len) {
-  this.m_.applyDelete(pos, len);
-  this.pushOp_(new text.Delete(pos, len));
 };
 
 Document.prototype.pushOp_ = function(op) {

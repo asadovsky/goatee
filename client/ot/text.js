@@ -4,8 +4,6 @@
 
 'use strict';
 
-var DEBUG_OT = false;
-
 function opFromString(s) {
   var colon = s.indexOf(':');
   if (colon === -1) {
@@ -67,7 +65,9 @@ function transformInsertDelete(a, b) {
 function transform(a, b) {
   /* jshint -W086 */
   // https://github.com/jshint/jshint/blob/master/src/messages.js
-  if (DEBUG_OT) console.log('transform(' + a + ', ' + b + ')');
+  if (process.env.DEBUG_OT) {
+    console.log('transform(' + a + ', ' + b + ')');
+  }
   switch (a.constructor.name) {
   case 'Insert':
     switch (b.constructor.name) {

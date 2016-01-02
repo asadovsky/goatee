@@ -32,6 +32,7 @@ func assert(b bool, v ...interface{}) {
 
 // Sent from server to clients.
 type NewClient struct {
+	Type      string
 	ClientId  int
 	BaseCopId int    // client's initial BaseCopId
 	Text      string // client's initial text
@@ -46,6 +47,7 @@ type Update struct {
 
 // Sent from server to clients.
 type Broadcast struct {
+	Type     string
 	CopId    int
 	OpStrs   []string // encoded compound op
 	ClientId int      // client that performed this compound op
@@ -108,8 +110,12 @@ func handle(h *hub, ws *websocket.Conn) {
 	}
 	h.mu.Unlock()
 
-	nc := &NewClient{ClientId: clientId, BaseCopId: baseCopId, Text: text.Value}
-	ok(websocket.Message.Send(ws, marshalOrPanic(nc)))
+	ok(websocket.Message.Send(ws, marshalOrPanic(NewClient{
+		Type:      "NewClient",
+		ClientId:  clientId,
+		BaseCopId: baseCopId,
+		Text:      text.Value,
+	})))
 
 	send := make(chan string)
 	eof, done := make(chan bool), make(chan bool)
@@ -147,12 +153,12 @@ func handle(h *hub, ws *websocket.Conn) {
 			h.cops = append(h.cops, compoundOp{ops, u.ClientId})
 			h.mu.Unlock()
 
-			bc := Broadcast{
+			h.broadcast <- marshalOrPanic(Broadcast{
+				Type:     "Broadcast",
 				CopId:    copId,
 				OpStrs:   opStrs,
 				ClientId: u.ClientId,
-			}
-			h.broadcast <- marshalOrPanic(bc)
+			})
 		}
 	}()
 

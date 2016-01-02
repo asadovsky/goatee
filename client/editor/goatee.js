@@ -29,8 +29,6 @@ var util = require('../util');
 inherits(Editor, EditorInterface);
 module.exports = Editor;
 
-var DEBUG = 0;
-
 function createDiv(style) {
   var el = document.createElement('div');
   _.assign(el.style, constants.baseStyle, style);
@@ -83,7 +81,9 @@ Cursor.prototype.hide = function() {
 
 // Here, bottom means "distance from top of editor to bottom of cursor".
 Cursor.prototype.move = function(left, bottom, height) {
-  if (DEBUG) console.log(left, bottom, height);
+  if (process.env.DEBUG_GOATEE) {
+    console.log(left, bottom, height);
+  }
   this.el_.style.left = left + 'px';
   this.el_.style.top = bottom - height + 'px';
   this.el_.style.height = height + 'px';
