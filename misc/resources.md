@@ -13,6 +13,8 @@
   https://hal.inria.fr/inria-00432368/document
 - Treedoc (2010)
   https://hal.inria.fr/inria-00445975/document
+- Logoot-Undo (2010)
+  http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=5374392
 - Evaluating CRDTs (e.g. WOOT, Logoot, Treedoc) for real-time editing (2011)
   https://hal.inria.fr/inria-00629503/document
 - Comprehensive study of CRDTs (2011)

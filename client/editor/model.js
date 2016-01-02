@@ -31,3 +31,11 @@ Model.prototype.deleteText = function(pos, len) {
 Model.prototype.setSelectionRange = function(start, end) {
   throw new Error('not implemented');
 };
+
+Model.prototype.undo = function() {
+  throw new Error('not implemented');
+};
+
+Model.prototype.redo = function() {
+  throw new Error('not implemented');
+};

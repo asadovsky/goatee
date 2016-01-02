@@ -15,6 +15,5 @@ function load(addr, docId, onDocLoaded) {
 
 module.exports = {
   load: load,
-  Document: Document,
-  Model: require('./model')
+  Document: Document
 };

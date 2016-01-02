@@ -10,9 +10,9 @@ var ModelInterface = require('./model');
 inherits(Model, ModelInterface);
 module.exports = Model;
 
-function Model() {
+function Model(initialText) {
   ModelInterface.call(this);
-  this.text_ = '';
+  this.text_ = initialText || '';
   this.selStart_ = 0;
   this.selEnd_ = 0;
 }

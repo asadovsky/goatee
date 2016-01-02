@@ -3,6 +3,7 @@
 'use strict';
 
 module.exports = {
+  AsyncModel: require('./async_model'),
   GoateeEditor: require('./goatee'),
   LocalModel: require('./local_model'),
   Model: require('./model'),

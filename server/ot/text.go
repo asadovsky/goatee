@@ -15,7 +15,7 @@ type Op interface {
 func OpFromString(s string) (Op, error) {
 	colon := strings.Index(s, ":")
 	if colon == -1 {
-		return nil, fmt.Errorf("Failed to parse operation %q", s)
+		return nil, fmt.Errorf("Failed to parse op %q", s)
 	}
 	pos, err := strconv.Atoi(s[1:colon])
 	if err != nil {
@@ -30,7 +30,7 @@ func OpFromString(s string) (Op, error) {
 		}
 		return &Delete{pos, length}, nil
 	}
-	return nil, fmt.Errorf("Unknown operation %q", s[0])
+	return nil, fmt.Errorf("Unknown op type %q", s[0])
 }
 
 func OpsFromStrings(strs []string) ([]Op, error) {
@@ -157,7 +157,7 @@ func (t *Text) Apply(op Op) error {
 		}
 		t.Value = t.Value[0:op.Pos] + t.Value[op.Pos+op.Len:]
 	default:
-		return fmt.Errorf("Unexpected operation type %T", t)
+		return fmt.Errorf("%T", t)
 	}
 	return nil
 }
