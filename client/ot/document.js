@@ -64,7 +64,7 @@ function Document(addr, docId, onDocLoaded) {
       that.sendBufferedOps_();
       return;
     }
-    var ops = text.opsFromStrings(msg['OpStrs']);
+    var ops = text.decodeOps(msg['OpStrs']);
     var tup = text.transformPatch(
       that.clientOps_.slice(that.ackedClientOpIdx_ + 1), ops);
     var bufferedOps = tup[0];
@@ -118,8 +118,7 @@ Document.prototype.sendBufferedOps_ = function() {
   this.sentClientOpIdx_ = this.clientOps_.length - 1;
   // TODO: Compress ops (e.g. combine insertions) before sending.
   var msg = {
-    OpStrs: text.opsToStrings(
-      this.clientOps_.slice(this.ackedClientOpIdx_ + 1)),
+    OpStrs: text.encodeOps(this.clientOps_.slice(this.ackedClientOpIdx_ + 1)),
     ClientId: this.clientId_,
     BasePatchId: this.basePatchId_
   };

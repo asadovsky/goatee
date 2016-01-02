@@ -7,12 +7,31 @@ import (
 	"strings"
 )
 
+// Op is an operation.
 type Op interface {
-	ToString() string
+	Encode() string
 }
 
-// OpFromString returns an Op given an encoded op.
-func OpFromString(s string) (Op, error) {
+type Insert struct {
+	Pos   int
+	Value string
+}
+
+func (op *Insert) Encode() string {
+	return fmt.Sprintf("i,%d,%s", op.Pos, op.Value)
+}
+
+type Delete struct {
+	Pos int
+	Len int
+}
+
+func (op *Delete) Encode() string {
+	return fmt.Sprintf("d,%d,%d", op.Pos, op.Len)
+}
+
+// DecodeOp returns an Op given an encoded op.
+func DecodeOp(s string) (Op, error) {
 	parts := strings.SplitN(s, ",", 3)
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("Failed to parse op %q", s)
@@ -24,54 +43,36 @@ func OpFromString(s string) (Op, error) {
 	t := parts[0]
 	switch t {
 	case "i":
-		return &Insert{Pos: pos, Value: parts[2]}, nil
+		return &Insert{pos, parts[2]}, nil
 	case "d":
 		length, err := strconv.Atoi(parts[2])
 		if err != nil {
 			return nil, err
 		}
-		return &Delete{Pos: pos, Len: length}, nil
+		return &Delete{pos, length}, nil
 	default:
 		return nil, fmt.Errorf("Unknown op type %q", t)
 	}
 }
 
-func OpsFromStrings(strs []string) ([]Op, error) {
+func EncodeOps(ops []Op) []string {
+	strs := make([]string, len(ops))
+	for i, v := range ops {
+		strs[i] = v.Encode()
+	}
+	return strs
+}
+
+func DecodeOps(strs []string) ([]Op, error) {
 	ops := make([]Op, len(strs))
 	for i, v := range strs {
-		op, err := OpFromString(v)
+		op, err := DecodeOp(v)
 		if err != nil {
 			return nil, err
 		}
 		ops[i] = op
 	}
 	return ops, nil
-}
-
-func OpsToStrings(ops []Op) []string {
-	strs := make([]string, len(ops))
-	for i, v := range ops {
-		strs[i] = v.ToString()
-	}
-	return strs
-}
-
-type Insert struct {
-	Pos   int
-	Value string
-}
-
-func (op *Insert) ToString() string {
-	return fmt.Sprintf("i,%d,%s", op.Pos, op.Value)
-}
-
-type Delete struct {
-	Pos int
-	Len int
-}
-
-func (op *Delete) ToString() string {
-	return fmt.Sprintf("d,%d,%d", op.Pos, op.Len)
 }
 
 // If insert starts at or before delete start position, delete shifts forward.

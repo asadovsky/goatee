@@ -6,7 +6,25 @@
 
 var util = require('../util');
 
-function opFromString(s) {
+function Insert(pos, value) {
+  this.pos = pos;
+  this.value = value;
+}
+
+Insert.prototype.encode = function() {
+  return ['i', this.pos, this.value].join(',');
+};
+
+function Delete(pos, len) {
+  this.pos = pos;
+  this.len = len;
+}
+
+Delete.prototype.encode = function() {
+  return ['d', this.pos, this.len].join(',');
+};
+
+function decodeOp(s) {
   var parts = util.splitN(s, ',', 3);
   if (parts.length < 3) {
     throw new Error('Failed to parse op "' + s + '"');
@@ -23,39 +41,21 @@ function opFromString(s) {
   }
 }
 
-function opsFromStrings(strs) {
-  var ops = new Array(strs.length);
-  for (var i = 0; i < strs.length; i++) {
-    ops[i] = opFromString(strs[i]);
-  }
-  return ops;
-}
-
-function opsToStrings(ops) {
+function encodeOps(ops) {
   var strs = new Array(ops.length);
   for (var i = 0; i < ops.length; i++) {
-    strs[i] = ops[i].toString();
+    strs[i] = ops[i].encode();
   }
   return strs;
 }
 
-function Insert(pos, value) {
-  this.pos = pos;
-  this.value = value;
+function decodeOps(strs) {
+  var ops = new Array(strs.length);
+  for (var i = 0; i < strs.length; i++) {
+    ops[i] = decodeOp(strs[i]);
+  }
+  return ops;
 }
-
-Insert.prototype.toString = function() {
-  return ['i', this.pos, this.value].join(',');
-};
-
-function Delete(pos, len) {
-  this.pos = pos;
-  this.len = len;
-}
-
-Delete.prototype.toString = function() {
-  return ['d', this.pos, this.len].join(',');
-};
 
 function transformInsertDelete(a, b) {
   if (a.pos <= b.pos) {
@@ -148,10 +148,10 @@ Text.prototype.applyPatch = function(ops) {
 };
 
 module.exports = {
-  opsFromStrings: opsFromStrings,
-  opsToStrings: opsToStrings,
   Insert: Insert,
   Delete: Delete,
+  encodeOps: encodeOps,
+  decodeOps: decodeOps,
   transform: transform,
   transformPatch: transformPatch,
   Text: Text

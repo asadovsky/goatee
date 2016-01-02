@@ -30,48 +30,47 @@ func eq(t *testing.T, got, want interface{}) {
 	}
 }
 
-// Shorthand for OpFromString.
-func ofs(t *testing.T, s string) ot.Op {
-	op, err := ot.OpFromString(s)
+func decodeOp(t *testing.T, s string) ot.Op {
+	op, err := ot.DecodeOp(s)
 	ok(t, err)
 	return op
 }
 
 func TestInsert(t *testing.T) {
 	op := ot.Insert{Pos: 0, Value: "foo"}
-	ds := op.ToString()
+	ds := op.Encode()
 	eq(t, ds, "i,0,foo")
-	eq(t, ds, ofs(t, ds).ToString())
+	eq(t, ds, decodeOp(t, ds).Encode())
 }
 
 func TestDelete(t *testing.T) {
 	op := ot.Delete{Pos: 2, Len: 4}
-	ds := op.ToString()
+	ds := op.Encode()
 	eq(t, ds, "d,2,4")
-	eq(t, ds, ofs(t, ds).ToString())
+	eq(t, ds, decodeOp(t, ds).Encode())
 }
 
-func TestOpFromString(t *testing.T) {
-	op := ofs(t, "i,2,bar")
+func TestDecodeOp(t *testing.T) {
+	op := decodeOp(t, "i,2,bar")
 	eq(t, *op.(*ot.Insert), ot.Insert{Pos: 2, Value: "bar"})
 
-	op = ofs(t, "d,5,2")
+	op = decodeOp(t, "d,5,2")
 	eq(t, *op.(*ot.Delete), ot.Delete{Pos: 5, Len: 2})
 }
 
-// Assumes OpFromString and Operator.ToString are tested.
+// Assumes DecodeOp and Op.Encode are tested.
 // TODO: Share tests between Go and JS, i.e. use data-driven tests.
 // TODO: Test TransformPatch.
 func TestTransform(t *testing.T) {
 	run := func(as, bs, aps, bps string, andReverse bool) {
-		ap, bp := ot.Transform(ofs(t, as), ofs(t, bs))
-		eq(t, ap.ToString(), aps)
-		eq(t, bp.ToString(), bps)
+		ap, bp := ot.Transform(decodeOp(t, as), decodeOp(t, bs))
+		eq(t, ap.Encode(), aps)
+		eq(t, bp.Encode(), bps)
 
 		if andReverse {
-			bp, ap = ot.Transform(ofs(t, bs), ofs(t, as))
-			eq(t, ap.ToString(), aps)
-			eq(t, bp.ToString(), bps)
+			bp, ap = ot.Transform(decodeOp(t, bs), decodeOp(t, as))
+			eq(t, ap.Encode(), aps)
+			eq(t, bp.Encode(), bps)
 		}
 	}
 

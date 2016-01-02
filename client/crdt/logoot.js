@@ -4,11 +4,29 @@
 
 var util = require('../util');
 
+function Insert(pid, value, nextPid) {
+  this.pid = pid;
+  this.value = value;
+  this.nextPid = nextPid || '';
+}
+
+Insert.prototype.encode = function() {
+  return ['i', this.pid, this.nextPid, this.value].join(',');
+};
+
+function Delete(pid) {
+  this.pid = pid;
+}
+
+Delete.prototype.encode = function() {
+  return ['d', this.pid].join(',');
+};
+
 function newParseError(s) {
   return new Error('Failed to parse op "' + s + '"');
 }
 
-function opFromString(s) {
+function decodeOp(s) {
   var parts;
   var t = s.split(',', 1);
   switch (t) {
@@ -29,46 +47,25 @@ function opFromString(s) {
   }
 }
 
-function opsFromStrings(strs) {
-  var ops = new Array(strs.length);
-  for (var i = 0; i < strs.length; i++) {
-    ops[i] = opFromString(strs[i]);
-  }
-  return ops;
-}
-
-function opsToStrings(ops) {
+function encodeOps(ops) {
   var strs = new Array(ops.length);
   for (var i = 0; i < ops.length; i++) {
-    strs[i] = ops[i].toString();
+    strs[i] = ops[i].encode();
   }
   return strs;
 }
 
-// For server insertions, id is the id of the inserted atom, and nextId is not
-// defined. For client insertions, id and nextId are the atoms to the left and
-// right of the insertion location.
-function Insert(id, value, nextId) {
-  this.id = id;
-  this.value = value;
-  this.nextId = nextId || '';
+function decodeOps(strs) {
+  var ops = new Array(strs.length);
+  for (var i = 0; i < strs.length; i++) {
+    ops[i] = decodeOp(strs[i]);
+  }
+  return ops;
 }
-
-Insert.prototype.toString = function() {
-  return ['i', this.id, this.nextId, this.value].join(',');
-};
-
-function Delete(id) {
-  this.id = id;
-}
-
-Delete.prototype.toString = function() {
-  return ['d', this.id].join(',');
-};
 
 module.exports = {
-  opsFromStrings: opsFromStrings,
-  opsToStrings: opsToStrings,
   Insert: Insert,
-  Delete: Delete
+  Delete: Delete,
+  encodeOps: encodeOps,
+  decodeOps: decodeOps
 };

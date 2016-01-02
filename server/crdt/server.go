@@ -67,7 +67,7 @@ type Broadcast struct {
 	ClientId int      // client that performed this patch
 }
 
-func marshalOrPanic(v interface{}) string {
+func jsonMarshalOrPanic(v interface{}) string {
 	b, err := json.Marshal(v)
 	ok(err)
 	return string(b)
@@ -123,7 +123,7 @@ func handle(h *hub, ws *websocket.Conn) {
 	}
 	h.mu.Unlock()
 
-	ok(websocket.Message.Send(ws, marshalOrPanic(NewClient{
+	ok(websocket.Message.Send(ws, jsonMarshalOrPanic(NewClient{
 		Type:        "NewClient",
 		ClientId:    clientId,
 		BasePatchId: basePatchId,
@@ -146,7 +146,7 @@ func handle(h *hub, ws *websocket.Conn) {
 			}
 			var u Update
 			ok(json.Unmarshal(b, &u))
-			ops, err := OpsFromStrings(u.OpStrs)
+			ops, err := DecodeOps(u.OpStrs)
 			ok(err)
 			log.Printf("%+v", u)
 
@@ -161,12 +161,12 @@ func handle(h *hub, ws *websocket.Conn) {
 				assert(patch.clientId != u.ClientId)
 				ops, _ = TransformPatch(ops, patch.ops)
 			}
-			opStrs := OpsToStrings(ops)
+			opStrs := EncodeOps(ops)
 			log.Printf("%q -> %q", u.OpStrs, opStrs)
 			h.patches = append(h.patches, patch{ops, u.ClientId})
 			h.mu.Unlock()
 
-			h.broadcast <- marshalOrPanic(Broadcast{
+			h.broadcast <- jsonMarshalOrPanic(Broadcast{
 				Type:     "Broadcast",
 				PatchId:  patchId,
 				OpStrs:   opStrs,

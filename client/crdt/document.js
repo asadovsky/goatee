@@ -39,7 +39,7 @@ function Document(addr, docId, onDocLoaded) {
 
     // Apply all mutations, regardless of whether they originated from this
     // client (i.e. unidirectional data flow).
-    var ops = text.opsFromStrings(msg['OpStrs']);
+    var ops = text.decodeOps(msg['OpStrs']);
     for (var i = 0; i < ops.length; i++) {
       // TODO: Update data structure that tracks Logoot metadata.
       var op = ops[i];
