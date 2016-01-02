@@ -1,3 +1,6 @@
+This document contains rough notes from design explorations for p2p
+collaborative editing.
+
 # Client
 
 - JS widgets for counter, register, set, etc.
@@ -32,7 +35,7 @@
 - Alternatively, we could implement client libs that speak CRDT (i.e. subset of
   sync protocol) with local server, but that seems heavy-weight
 - Note, today's Syncbase objects can be thought of as state-based LWW registers,
-  though for that our DAG bookkeeping is unnecessarily expensive
+  though for that our DAG bookkeeping is superfluous
 
 ### Op-based
 
