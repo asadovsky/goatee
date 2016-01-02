@@ -1,21 +1,24 @@
-// Mirrors Go text OT library.
+// Mirrors server/ot/text.go. Similar to client/logoot/text.js.
 //
 // TODO: Shared, data-driven unit tests.
 
 'use strict';
 
+var util = require('../util');
+
 function opFromString(s) {
-  var colon = s.indexOf(':');
-  if (colon === -1) {
+  var parts = util.splitN(s, ',', 3);
+  if (parts.length < 3) {
     throw new Error('Failed to parse op "' + s + '"');
   }
-  var pos = parseInt(s.substr(1, colon));
-  if (s[0] === 'i') {
-    return new Insert(pos, s.substr(colon + 1));
-  } else if (s[0] === 'd') {
-    return new Delete(pos, parseInt(s.substr(colon + 1)));
+  var pos = Number(parts[1]);
+  var t = parts[0];
+  if (t === 'i') {
+    return new Insert(pos, parts[2]);
+  } else if (t === 'd') {
+    return new Delete(pos, Number(parts[2]));
   }
-  throw new Error('Unknown op type "' + s[0] + '"');
+  throw new Error('Unknown op type "' + t + '"');
 }
 
 function opsFromStrings(strs) {
@@ -40,7 +43,7 @@ function Insert(pos, value) {
 }
 
 Insert.prototype.toString = function() {
-  return 'i' + this.pos + ':' + this.value;
+  return ['i', this.pos, this.value].join(',');
 };
 
 function Delete(pos, len) {
@@ -49,7 +52,7 @@ function Delete(pos, len) {
 }
 
 Delete.prototype.toString = function() {
-  return 'd' + this.pos + ':' + this.len;
+  return ['d', this.pos, this.len].join(',');
 };
 
 function transformInsertDelete(a, b) {

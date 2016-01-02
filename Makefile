@@ -60,11 +60,18 @@ demo-ot: build
 dist/client/editor/tests/goatee.min.js: client/editor/tests/goatee.js $(shell find client) node_modules
 	$(call BROWSERIFY,$<,$@)
 
+.PHONY: test-server
+test-server:
+	go test github.com/asadovsky/goatee/server/...
+
 # TODO: Use https://github.com/hughsk/smokestack.
 .PHONY: test-editor
 test-editor: dist/client/editor/tests/goatee.min.js
 	@cp client/editor/tests/goatee.html dist/client/editor/tests
 	open file://$(shell pwd)/dist/client/editor/tests/goatee.html
+
+.PHONY: test
+test: test-server test-editor
 
 .PHONY: clean
 clean:
@@ -72,4 +79,5 @@ clean:
 
 .PHONY: lint
 lint: node_modules
+	go vet github.com/asadovsky/goatee/server/...
 	jshint .

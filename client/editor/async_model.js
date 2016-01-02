@@ -4,8 +4,8 @@
 
 var inherits = require('inherits');
 
-var ev = require('../editor/events');
-var ModelInterface = require('../editor/model');
+var ev = require('./events');
+var ModelInterface = require('./model');
 
 inherits(Model, ModelInterface);
 module.exports = Model;

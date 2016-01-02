@@ -46,14 +46,14 @@ function Document(addr, docId, onDocLoaded) {
     if (msg['Type'] === 'NewClient') {
       console.assert(that.clientId_ === null);
       that.clientId_ = msg['ClientId'];
-      that.baseCopId_ = parseInt(msg['BaseCopId']);
+      that.baseCopId_ = Number(msg['BaseCopId']);
       that.m_ = new AsyncModel(that, msg['Text']);
       onDocLoaded(that);
       return;
     }
 
     console.assert(msg['Type'] === 'Broadcast');
-    var newBaseCopId = parseInt(msg['CopId']);
+    var newBaseCopId = Number(msg['CopId']);
     console.assert(newBaseCopId === that.baseCopId_ + 1);
     that.baseCopId_ = newBaseCopId;
 

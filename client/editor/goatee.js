@@ -153,6 +153,8 @@ Editor.prototype.reset = function(model) {
   this.el_.appendChild(this.innerEl_);
 
   // Set fields that depend on DOM.
+  // TODO: It seems we shouldn't care at all about this.el_'s width or border
+  // width. Why can't everything be relative to this.innerEl_?
   this.borderWidth_ = parseInt(window.getComputedStyle(
     this.el_, null).getPropertyValue('border-top-width'), 10);
   this.width_ = parseInt(window.getComputedStyle(

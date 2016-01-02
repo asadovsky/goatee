@@ -11,26 +11,27 @@ type Op interface {
 	ToString() string
 }
 
-// Given an encoded op like "i4:foo" or "d2:2", returns an Op.
+// Given an encoded op like "i,4,foo" or "d,2,2", returns an Op.
 func OpFromString(s string) (Op, error) {
-	colon := strings.Index(s, ":")
-	if colon == -1 {
+	parts := strings.SplitN(s, ",", 3)
+	if len(parts) < 3 {
 		return nil, fmt.Errorf("Failed to parse op %q", s)
 	}
-	pos, err := strconv.Atoi(s[1:colon])
+	pos, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return nil, err
 	}
-	if s[0] == 'i' {
-		return &Insert{Pos: pos, Value: s[colon+1:]}, nil
-	} else if s[0] == 'd' {
-		length, err := strconv.Atoi(s[colon+1:])
+	t := parts[0]
+	if t == "i" {
+		return &Insert{Pos: pos, Value: parts[2]}, nil
+	} else if t == "d" {
+		length, err := strconv.Atoi(parts[2])
 		if err != nil {
 			return nil, err
 		}
-		return &Delete{pos, length}, nil
+		return &Delete{Pos: pos, Len: length}, nil
 	}
-	return nil, fmt.Errorf("Unknown op type %q", s[0])
+	return nil, fmt.Errorf("Unknown op type %q", t)
 }
 
 func OpsFromStrings(strs []string) ([]Op, error) {
@@ -59,7 +60,7 @@ type Insert struct {
 }
 
 func (op *Insert) ToString() string {
-	return fmt.Sprintf("i%d:%v", op.Pos, op.Value)
+	return fmt.Sprintf("i,%d,%s", op.Pos, op.Value)
 }
 
 type Delete struct {
@@ -68,7 +69,7 @@ type Delete struct {
 }
 
 func (op *Delete) ToString() string {
-	return fmt.Sprintf("d%d:%d", op.Pos, op.Len)
+	return fmt.Sprintf("d,%d,%d", op.Pos, op.Len)
 }
 
 // If insert starts at or before delete start position, delete shifts forward.
