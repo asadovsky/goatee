@@ -1,4 +1,4 @@
-// Similar to client/ot/text.js.
+// Mirrors server/crdt/logoot.go.
 
 'use strict';
 
@@ -9,21 +9,24 @@ function newParseError(s) {
 }
 
 function opFromString(s) {
-  var parts, t = s.split(',', 1);
-  if (t === 'i') {
+  var parts;
+  var t = s.split(',', 1);
+  switch (t) {
+  case 'i':
     parts = util.splitN(s, ',', 4);
     if (parts.length < 3) {
       throw newParseError(s);
     }
     return new Insert(parts[1], parts[3], parts[2]);
-  } else if (t === 'd') {
+  case 'd':
     parts = util.splitN(s, ',', 2);
     if (parts.length < 2) {
       throw newParseError(s);
     }
     return new Delete(parts[1]);
+  default:
+    throw new Error('Unknown op type "' + t + '"');
   }
-  throw new Error('Unknown op type "' + t + '"');
 }
 
 function opsFromStrings(strs) {

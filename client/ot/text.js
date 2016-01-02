@@ -1,4 +1,4 @@
-// Mirrors server/ot/text.go. Similar to client/crdt/logoot.js.
+// Mirrors server/ot/text.go.
 //
 // TODO: Shared, data-driven unit tests.
 
@@ -13,12 +13,14 @@ function opFromString(s) {
   }
   var pos = Number(parts[1]);
   var t = parts[0];
-  if (t === 'i') {
+  switch (t) {
+  case 'i':
     return new Insert(pos, parts[2]);
-  } else if (t === 'd') {
+  case 'd':
     return new Delete(pos, Number(parts[2]));
+  default:
+    throw new Error('Unknown op type "' + t + '"');
   }
-  throw new Error('Unknown op type "' + t + '"');
 }
 
 function opsFromStrings(strs) {
@@ -105,7 +107,7 @@ function transform(a, b) {
   }
 }
 
-function transformCompound(a, b) {
+function transformPatch(a, b) {
   var aNew = a.slice(0);
   var bNew = new Array(b.length);
   for (var i = 0; i < b.length; i++) {
@@ -139,7 +141,7 @@ Text.prototype.apply = function(op) {
   }
 };
 
-Text.prototype.applyCompound = function(ops) {
+Text.prototype.applyPatch = function(ops) {
   for (var i = 0; i < ops.length; i++) {
     this.apply(ops[i]);
   }
@@ -151,6 +153,6 @@ module.exports = {
   Insert: Insert,
   Delete: Delete,
   transform: transform,
-  transformCompound: transformCompound,
+  transformPatch: transformPatch,
   Text: Text
 };

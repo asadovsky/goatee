@@ -31,7 +31,7 @@ collaborative editing.
   out-of-date objects
 - Note, this is at odds with local client-server OT, since we won't know how to
   transform the client ops (unless we retain state history at the server and can
-  compute a "delta compound op" between any two states)
+  compute a patch between any two states)
 - Alternatively, we could implement client libs that speak CRDT (i.e. subset of
   sync protocol) with local server, but that seems heavy-weight
 - Note, today's Syncbase objects can be thought of as state-based LWW registers,

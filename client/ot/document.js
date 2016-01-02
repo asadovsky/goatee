@@ -21,7 +21,7 @@ function Document(addr, docId, onDocLoaded) {
 
   // Initialized by NewClient message from server.
   this.clientId_ = null;
-  this.baseCopId_ = null;  // last compound op we've gotten from server
+  this.basePatchId_ = null;  // last patch we've gotten from server
   this.m_ = null;
 
   // The most recent clientOps index sent to and acknowledged by the server.
@@ -46,18 +46,18 @@ function Document(addr, docId, onDocLoaded) {
     if (msg['Type'] === 'NewClient') {
       console.assert(that.clientId_ === null);
       that.clientId_ = msg['ClientId'];
-      that.baseCopId_ = Number(msg['BaseCopId']);
+      that.basePatchId_ = Number(msg['BasePatchId']);
       that.m_ = new AsyncModel(that, msg['Text']);
       onDocLoaded(that);
       return;
     }
 
     console.assert(msg['Type'] === 'Broadcast');
-    var newBaseCopId = Number(msg['CopId']);
-    console.assert(newBaseCopId === that.baseCopId_ + 1);
-    that.baseCopId_ = newBaseCopId;
+    var newBasePatchId = Number(msg['PatchId']);
+    console.assert(newBasePatchId === that.basePatchId_ + 1);
+    that.basePatchId_ = newBasePatchId;
 
-    // If the compound op is from this client, send all buffered ops to server.
+    // If the patch is from this client, send all buffered ops to server.
     // Otherwise, transform it against all buffered ops and then apply it.
     if (msg['ClientId'] === that.clientId_) {
       that.ackedClientOpIdx_ = that.sentClientOpIdx_;
@@ -65,7 +65,7 @@ function Document(addr, docId, onDocLoaded) {
       return;
     }
     var ops = text.opsFromStrings(msg['OpStrs']);
-    var tup = text.transformCompound(
+    var tup = text.transformPatch(
       that.clientOps_.slice(that.ackedClientOpIdx_ + 1), ops);
     var bufferedOps = tup[0];
     ops = tup[1];
@@ -74,7 +74,7 @@ function Document(addr, docId, onDocLoaded) {
     for (i = 0; i < bufferedOps.length; i++) {
       that.clientOps_[that.ackedClientOpIdx_ + 1 + i] = bufferedOps[i];
     }
-    // Apply the transformed server compound op against the client text.
+    // Apply the transformed server patch against the client text.
     for (i = 0; i < ops.length; i++) {
       var op = ops[i];
       switch (op.constructor.name) {
@@ -121,7 +121,7 @@ Document.prototype.sendBufferedOps_ = function() {
     OpStrs: text.opsToStrings(
       this.clientOps_.slice(this.ackedClientOpIdx_ + 1)),
     ClientId: this.clientId_,
-    BaseCopId: this.baseCopId_
+    BasePatchId: this.basePatchId_
   };
   var send = function() {
     var json = JSON.stringify(msg);

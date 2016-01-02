@@ -11,7 +11,7 @@ type Op interface {
 	ToString() string
 }
 
-// Given an encoded op like "i,4,foo" or "d,2,2", returns an Op.
+// OpFromString returns an Op given an encoded op.
 func OpFromString(s string) (Op, error) {
 	parts := strings.SplitN(s, ",", 3)
 	if len(parts) < 3 {
@@ -22,16 +22,18 @@ func OpFromString(s string) (Op, error) {
 		return nil, err
 	}
 	t := parts[0]
-	if t == "i" {
+	switch t {
+	case "i":
 		return &Insert{Pos: pos, Value: parts[2]}, nil
-	} else if t == "d" {
+	case "d":
 		length, err := strconv.Atoi(parts[2])
 		if err != nil {
 			return nil, err
 		}
 		return &Delete{Pos: pos, Len: length}, nil
+	default:
+		return nil, fmt.Errorf("Unknown op type %q", t)
 	}
-	return nil, fmt.Errorf("Unknown op type %q", t)
 }
 
 func OpsFromStrings(strs []string) ([]Op, error) {
@@ -86,9 +88,9 @@ func transformInsertDelete(a *Insert, b *Delete) (ap, bp Op) {
 	}
 }
 
-// Derives the bottom two sides of the OT diamond. I.e. transforms (a, b) into
-// (a', b'), assuming b takes priority over a. Handles situations where the
-// operations conflict. Note that priority matters only for i-i.
+// Transform derives the bottom two sides of the OT diamond. In other words, it
+// transforms (a, b) into (a', b'). Assumes b takes priority over a, e.g. for
+// insert-insert conflicts.
 func Transform(a, b Op) (ap, bp Op) {
 	switch ai := a.(type) {
 	case *Insert:
@@ -125,8 +127,7 @@ func Transform(a, b Op) (ap, bp Op) {
 	return nil, nil
 }
 
-// Same as Transform, but for compound operations.
-func TransformCompound(a, b []Op) (ap, bp []Op) {
+func TransformPatch(a, b []Op) (ap, bp []Op) {
 	aNew, bNew := make([]Op, len(a)), make([]Op, len(b))
 	copy(aNew, a)
 	for i, bOp := range b {
@@ -138,7 +139,7 @@ func TransformCompound(a, b []Op) (ap, bp []Op) {
 	return aNew, bNew
 }
 
-// Represents text against which operations can be applied.
+// Text represents a string that supports OT operations.
 // TODO: Support cursors and rich text (using annotated ranges).
 type Text struct {
 	Value string
@@ -163,7 +164,7 @@ func (t *Text) Apply(op Op) error {
 	return nil
 }
 
-func (t *Text) ApplyCompound(ops []Op) error {
+func (t *Text) ApplyPatch(ops []Op) error {
 	for _, op := range ops {
 		if err := t.Apply(op); err != nil {
 			return err

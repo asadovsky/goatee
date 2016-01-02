@@ -61,7 +61,7 @@ func TestOpFromString(t *testing.T) {
 
 // Assumes OpFromString and Operator.ToString are tested.
 // TODO: Share tests between Go and JS, i.e. use data-driven tests.
-// TODO: Test TransformCompound.
+// TODO: Test TransformPatch.
 func TestTransform(t *testing.T) {
 	run := func(as, bs, aps, bps string, andReverse bool) {
 		ap, bp := ot.Transform(ofs(t, as), ofs(t, bs))
@@ -136,13 +136,13 @@ func TestApplyTwice(t *testing.T) {
 	textEq(t, text, "fooo")
 }
 
-func TestApplyCompound(t *testing.T) {
+func TestApplyPatch(t *testing.T) {
 	text := ot.NewText("foobar")
 	ops := []ot.Op{
 		&ot.Delete{Pos: 0, Len: 3},
 		&ot.Insert{Pos: 2, Value: "seball"},
 		&ot.Delete{Pos: 8, Len: 1},
 	}
-	text.ApplyCompound(ops)
+	text.ApplyPatch(ops)
 	textEq(t, text, "baseball")
 }
