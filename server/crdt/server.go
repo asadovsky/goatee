@@ -1,5 +1,5 @@
-// Package logoot implements Logoot.
-package logoot
+// Package crdt implements (for now) Logoot and (eventually) other CRDTs.
+package crdt
 
 // Prototype implementation notes:
 // - Server-side: single Logoot document (analog of OT server)

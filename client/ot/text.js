@@ -1,4 +1,4 @@
-// Mirrors server/ot/text.go. Similar to client/logoot/text.js.
+// Mirrors server/ot/text.go. Similar to client/crdt/logoot.js.
 //
 // TODO: Shared, data-driven unit tests.
 
