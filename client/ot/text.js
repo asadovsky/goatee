@@ -4,8 +4,17 @@
 
 'use strict';
 
+var inherits = require('inherits');
+
 var util = require('../util');
 
+function Op() {}
+
+Op.prototype.encode = function() {
+  throw new Error('not implemented');
+};
+
+inherits(Insert, Op);
 function Insert(pos, value) {
   this.pos = pos;
   this.value = value;
@@ -15,6 +24,7 @@ Insert.prototype.encode = function() {
   return ['i', this.pos, this.value].join(',');
 };
 
+inherits(Delete, Op);
 function Delete(pos, len) {
   this.pos = pos;
   this.len = len;

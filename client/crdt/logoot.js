@@ -2,8 +2,17 @@
 
 'use strict';
 
+var inherits = require('inherits');
+
 var util = require('../util');
 
+function Op() {}
+
+Op.prototype.encode = function() {
+  throw new Error('not implemented');
+};
+
+inherits(Insert, Op);
 function Insert(pid, value, nextPid) {
   this.pid = pid;
   this.value = value;
@@ -14,6 +23,7 @@ Insert.prototype.encode = function() {
   return ['i', this.pid, this.nextPid, this.value].join(',');
 };
 
+inherits(Delete, Op);
 function Delete(pid) {
   this.pid = pid;
 }
