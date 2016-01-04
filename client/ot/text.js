@@ -37,7 +37,7 @@ Delete.prototype.encode = function() {
 function decodeOp(s) {
   var parts = util.splitN(s, ',', 3);
   if (parts.length < 3) {
-    throw new Error('Failed to parse op "' + s + '"');
+    throw new Error('failed to parse op "' + s + '"');
   }
   var pos = Number(parts[1]);
   var t = parts[0];
@@ -47,7 +47,7 @@ function decodeOp(s) {
   case 'd':
     return new Delete(pos, Number(parts[2]));
   default:
-    throw new Error('Unknown op type "' + t + '"');
+    throw new Error('unknown op type "' + t + '"');
   }
 }
 
@@ -70,10 +70,10 @@ function decodeOps(strs) {
 function transformInsertDelete(a, b) {
   if (a.pos <= b.pos) {
     return [a, new Delete(b.pos + a.value.length, b.len)];
-  } else if (a.pos < b.pos + b.len) {
-    return [new Insert(b.pos, ''), new Delete(b.pos, b.len + a.value.length)];
-  } else {
+  } else if (a.pos >= b.pos + b.len) {
     return [new Insert(a.pos - b.len, a.value), b];
+  } else {
+    return [new Insert(b.pos, ''), new Delete(b.pos, b.len + a.value.length)];
   }
 }
 
@@ -132,31 +132,6 @@ function transformPatch(a, b) {
   return [aNew, bNew];
 }
 
-function Text(s) {
-  this.value = s;
-}
-
-Text.prototype.apply = function(op) {
-  var v = this.value;
-  switch (op.constructor.name) {
-  case 'Insert':
-    this.value = v.substr(0, op.pos) + op.value + v.substr(op.pos);
-    break;
-  case 'Delete':
-    console.assert(op.pos + op.len <= v.length, 'Delete past end');
-    this.value = v.substr(0, op.pos) + v.substr(op.pos + op.len);
-    break;
-  default:
-    throw new Error(op.constructor.name);
-  }
-};
-
-Text.prototype.applyPatch = function(ops) {
-  for (var i = 0; i < ops.length; i++) {
-    this.apply(ops[i]);
-  }
-};
-
 module.exports = {
   Insert: Insert,
   Delete: Delete,
@@ -164,5 +139,4 @@ module.exports = {
   decodeOps: decodeOps,
   transform: transform,
   transformPatch: transformPatch,
-  Text: Text
 };

@@ -10,13 +10,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/asadovsky/goatee/server/ot"
 	"github.com/asadovsky/gosh"
+
+	"github.com/asadovsky/goatee/server/hub"
 )
 
 var (
-	port    = flag.Int("port", 4000, "")
-	serveFn = gosh.Register("serve", ot.Serve)
+	loopback = flag.Bool("loopback", true, "")
+	port     = flag.Int("port", 4000, "")
+	serveFn  = gosh.Register("serve", hub.Serve)
 )
 
 func ok(err error) {
@@ -45,11 +47,15 @@ func main() {
 	defer sh.Cleanup()
 	cwd, err := os.Getwd()
 	ok(err)
-	hostname, err := ip()
-	ok(err)
+	hostname := "localhost"
+	if !*loopback {
+		hostname, err = ip()
+		ok(err)
+	}
 	addr := fmt.Sprintf("%s:%d", hostname, *port)
 	httpAddr := fmt.Sprintf("%s:8080", hostname)
 	c := sh.Fn(serveFn, addr)
+	c.AddStderrWriter(os.Stderr)
 	c.Start()
 	c.AwaitReady()
 	// Note, the "open" command doesn't support query strings in file urls.

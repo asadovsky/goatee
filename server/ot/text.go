@@ -5,13 +5,23 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/asadovsky/goatee/server/common"
 )
+
+func assert(b bool, v ...interface{}) {
+	if !b {
+		panic(fmt.Sprint(v...))
+	}
+}
 
 // Op is an operation.
 type Op interface {
 	Encode() string
+	Apply(s string) (string, error)
 }
 
+// Insert represents a text insertion.
 type Insert struct {
 	Pos   int
 	Value string
@@ -21,6 +31,14 @@ func (op *Insert) Encode() string {
 	return fmt.Sprintf("i,%d,%s", op.Pos, op.Value)
 }
 
+func (op *Insert) Apply(s string) (string, error) {
+	if op.Pos < 0 || op.Pos > len(s) {
+		return "", errors.New("insert out of bounds")
+	}
+	return s[0:op.Pos] + op.Value + s[op.Pos:], nil
+}
+
+// Delete represents a text deletion.
 type Delete struct {
 	Pos int
 	Len int
@@ -30,11 +48,18 @@ func (op *Delete) Encode() string {
 	return fmt.Sprintf("d,%d,%d", op.Pos, op.Len)
 }
 
+func (op *Delete) Apply(s string) (string, error) {
+	if op.Pos < 0 || op.Pos+op.Len > len(s) {
+		return "", errors.New("delete out of bounds")
+	}
+	return s[0:op.Pos] + s[op.Pos+op.Len:], nil
+}
+
 // DecodeOp returns an Op given an encoded op.
 func DecodeOp(s string) (Op, error) {
 	parts := strings.SplitN(s, ",", 3)
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("Failed to parse op %q", s)
+		return nil, fmt.Errorf("failed to parse op %q", s)
 	}
 	pos, err := strconv.Atoi(parts[1])
 	if err != nil {
@@ -51,7 +76,7 @@ func DecodeOp(s string) (Op, error) {
 		}
 		return &Delete{pos, length}, nil
 	default:
-		return nil, fmt.Errorf("Unknown op type %q", t)
+		return nil, fmt.Errorf("unknown op type %q", t)
 	}
 }
 
@@ -75,17 +100,19 @@ func DecodeOps(strs []string) ([]Op, error) {
 	return ops, nil
 }
 
-// If insert starts at or before delete start position, delete shifts forward.
-// If insert starts at or after delete end position, insert shifts backward.
-// Otherwise, insert falls inside delete range; delete expands to include the
-// insert, and insert collapses to nothing.
+// transformInsertDelete derives the bottom two sides of the OT diamond, where
+// the top two sides are an insert and a delete.
 func transformInsertDelete(a *Insert, b *Delete) (ap, bp Op) {
 	if a.Pos <= b.Pos {
+		// Insert before delete. Delete shifts forward.
 		return a, &Delete{b.Pos + len(a.Value), b.Len}
-	} else if a.Pos < b.Pos+b.Len {
-		return &Insert{b.Pos, ""}, &Delete{b.Pos, b.Len + len(a.Value)}
-	} else { // a.Pos >= b.Pos+b.Len
+	} else if a.Pos >= b.Pos+b.Len {
+		// Insert after delete. Insert shifts backward.
 		return &Insert{a.Pos - b.Len, a.Value}, b
+	} else {
+		// Insert inside the delete range. Delete expands to include the insert,
+		// and insert collapses to nothing.
+		return &Insert{b.Pos, ""}, &Delete{b.Pos, b.Len + len(a.Value)}
 	}
 }
 
@@ -97,7 +124,7 @@ func Transform(a, b Op) (ap, bp Op) {
 	case *Insert:
 		switch bi := b.(type) {
 		case *Insert:
-			// When positions are equal, a' shifts forward.
+			// When insert positions are equal, a' shifts forward.
 			if bi.Pos <= ai.Pos {
 				return &Insert{ai.Pos + len(bi.Value), ai.Value}, b
 			} else {
@@ -140,38 +167,60 @@ func TransformPatch(a, b []Op) (ap, bp []Op) {
 	return aNew, bNew
 }
 
+type patch struct {
+	clientId int
+	ops      []Op
+}
+
 // Text represents a string that supports OT operations.
 // TODO: Support cursors and rich text (using annotated ranges).
 type Text struct {
-	Value string
+	patches     []patch
+	value       string
+	lastPatchId int
 }
 
 func NewText(s string) *Text {
-	return &Text{Value: s}
+	return &Text{value: s}
 }
 
-func (t *Text) Apply(op Op) error {
-	switch op := op.(type) {
-	case *Insert:
-		t.Value = t.Value[0:op.Pos] + op.Value + t.Value[op.Pos:]
-	case *Delete:
-		if op.Pos+op.Len > len(t.Value) {
-			return errors.New("Delete past end")
-		}
-		t.Value = t.Value[0:op.Pos] + t.Value[op.Pos+op.Len:]
-	default:
-		return fmt.Errorf("%T", t)
+func (t *Text) Value() string {
+	return t.value
+}
+
+func (t *Text) GetSnapshot(s *common.Snapshot) {
+	s.BasePatchId = t.lastPatchId
+	s.Text = t.value
+}
+
+func (t *Text) ApplyUpdate(u *common.Update) (*common.Change, error) {
+	ops, err := DecodeOps(u.OpStrs)
+	if err != nil {
+		return nil, err
 	}
-	return nil
-}
-
-func (t *Text) ApplyPatch(ops []Op) error {
+	// Transform against past ops as needed.
+	for i := u.BasePatchId + 1; i < len(t.patches); i++ {
+		p := t.patches[i]
+		if u.ClientId == p.clientId {
+			// Note: Clients are responsible for buffering.
+			return nil, errors.New("patch is not parented off server state")
+		}
+		ops, _ = TransformPatch(ops, p.ops)
+	}
+	value := t.value
 	for _, op := range ops {
-		if err := t.Apply(op); err != nil {
-			return err
+		var err error
+		if value, err = op.Apply(value); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	t.patches = append(t.patches, patch{u.ClientId, ops})
+	t.value = value
+	t.lastPatchId++
+	return &common.Change{
+		PatchId: t.lastPatchId,
+		OpStrs:  EncodeOps(ops),
+	}, nil
 }
 
 ////////////////////////////////////////

@@ -5,6 +5,7 @@ import (
 	"runtime/debug"
 	"testing"
 
+	"github.com/asadovsky/goatee/server/common"
 	"github.com/asadovsky/goatee/server/ot"
 )
 
@@ -30,6 +31,12 @@ func eq(t *testing.T, got, want interface{}) {
 	}
 }
 
+func neq(t *testing.T, got, notWant interface{}) {
+	if reflect.DeepEqual(got, notWant) {
+		fatalf(t, "got %v", got)
+	}
+}
+
 func decodeOp(t *testing.T, s string) ot.Op {
 	op, err := ot.DecodeOp(s)
 	ok(t, err)
@@ -48,6 +55,22 @@ func TestDelete(t *testing.T) {
 	ds := op.Encode()
 	eq(t, ds, "d,2,4")
 	eq(t, ds, decodeOp(t, ds).Encode())
+}
+
+func TestApply(t *testing.T) {
+	s := ""
+	var err error
+	var op ot.Op = &ot.Insert{Pos: 0, Value: "foo"}
+	s, err = op.Apply(s)
+	ok(t, err)
+	s, err = op.Apply(s)
+	ok(t, err)
+	op = &ot.Delete{Pos: 2, Len: 1}
+	s, err = op.Apply(s)
+	ok(t, err)
+	s, err = op.Apply(s)
+	ok(t, err)
+	eq(t, s, "fooo")
 }
 
 func TestDecodeOp(t *testing.T) {
@@ -108,40 +131,32 @@ func TestTransform(t *testing.T) {
 	run("d,8,2", "d,3,4", "d,4,2", "d,3,4", true)
 }
 
-func textEq(t *testing.T, text *ot.Text, s string) {
-	eq(t, text.Value, s)
+func TestTextValue(t *testing.T) {
+	eq(t, ot.NewText("").Value(), "")
+	eq(t, ot.NewText("foo").Value(), "foo")
 }
 
-func TestNewText(t *testing.T) {
-	textEq(t, ot.NewText(""), "")
-	textEq(t, ot.NewText("foo"), "foo")
+func TestTextGetSnapshot(t *testing.T) {
+	var s common.Snapshot
+	ot.NewText("").GetSnapshot(&s)
+	eq(t, s, common.Snapshot{Text: "", BasePatchId: 0})
+	ot.NewText("foo").GetSnapshot(&s)
+	eq(t, s, common.Snapshot{Text: "foo", BasePatchId: 0})
 }
 
-func TestApplyToEmpty(t *testing.T) {
-	text := ot.NewText("")
-	op := &ot.Insert{Pos: 0, Value: "foo"}
-	text.Apply(op)
-	textEq(t, text, "foo")
-}
-
-func TestApplyTwice(t *testing.T) {
-	text := ot.NewText("")
-	var op ot.Op = &ot.Insert{Pos: 0, Value: "foo"}
-	text.Apply(op)
-	text.Apply(op)
-	op = &ot.Delete{Pos: 2, Len: 1}
-	text.Apply(op)
-	text.Apply(op)
-	textEq(t, text, "fooo")
-}
-
-func TestApplyPatch(t *testing.T) {
+func TestTextApplyUpdate(t *testing.T) {
 	text := ot.NewText("foobar")
-	ops := []ot.Op{
+	opStrs := ot.EncodeOps([]ot.Op{
 		&ot.Delete{Pos: 0, Len: 3},
 		&ot.Insert{Pos: 2, Value: "seball"},
 		&ot.Delete{Pos: 8, Len: 1},
-	}
-	text.ApplyPatch(ops)
-	textEq(t, text, "baseball")
+	})
+	c, err := text.ApplyUpdate(&common.Update{
+		BasePatchId: 0,
+		OpStrs:      opStrs,
+	})
+	ok(t, err)
+	neq(t, c.PatchId, 0)
+	eq(t, c.OpStrs, opStrs)
+	eq(t, text.Value(), "baseball")
 }

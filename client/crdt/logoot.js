@@ -33,7 +33,7 @@ Delete.prototype.encode = function() {
 };
 
 function newParseError(s) {
-  return new Error('Failed to parse op "' + s + '"');
+  return new Error('failed to parse op "' + s + '"');
 }
 
 function decodeOp(s) {
@@ -53,7 +53,7 @@ function decodeOp(s) {
     }
     return new Delete(parts[1]);
   default:
-    throw new Error('Unknown op type "' + t + '"');
+    throw new Error('unknown op type "' + t + '"');
   }
 }
 
