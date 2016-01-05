@@ -136,13 +136,15 @@ func (l *Logoot) Value() string {
 	return l.value
 }
 
-func (l *Logoot) GetSnapshot(s *common.Snapshot) {
+// PopulateSnapshot populates s.
+func (l *Logoot) PopulateSnapshot(s *common.Snapshot) {
 	s.Text = l.value
 	s.LogootStr = l.Encode()
 }
 
-func (t *Logoot) ApplyUpdate(u *common.Update) (*common.Change, error) {
-	return &common.Change{}, nil
+// ApplyUpdate applies u and populates c.
+func (l *Logoot) ApplyUpdate(u *common.Update, c *common.Change) error {
+	return nil
 }
 
 func (l *Logoot) Encode() string {

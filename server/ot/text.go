@@ -188,22 +188,24 @@ func (t *Text) Value() string {
 	return t.value
 }
 
-func (t *Text) GetSnapshot(s *common.Snapshot) {
+// PopulateSnapshot populates s.
+func (t *Text) PopulateSnapshot(s *common.Snapshot) {
 	s.BasePatchId = t.lastPatchId
 	s.Text = t.value
 }
 
-func (t *Text) ApplyUpdate(u *common.Update) (*common.Change, error) {
+// ApplyUpdate applies u and populates c.
+func (t *Text) ApplyUpdate(u *common.Update, c *common.Change) error {
 	ops, err := DecodeOps(u.OpStrs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Transform against past ops as needed.
 	for i := u.BasePatchId + 1; i < len(t.patches); i++ {
 		p := t.patches[i]
 		if u.ClientId == p.clientId {
 			// Note: Clients are responsible for buffering.
-			return nil, errors.New("patch is not parented off server state")
+			return errors.New("patch is not parented off server state")
 		}
 		ops, _ = TransformPatch(ops, p.ops)
 	}
@@ -211,16 +213,15 @@ func (t *Text) ApplyUpdate(u *common.Update) (*common.Change, error) {
 	for _, op := range ops {
 		var err error
 		if value, err = op.Apply(value); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	t.patches = append(t.patches, patch{u.ClientId, ops})
 	t.value = value
 	t.lastPatchId++
-	return &common.Change{
-		PatchId: t.lastPatchId,
-		OpStrs:  EncodeOps(ops),
-	}, nil
+	c.PatchId = t.lastPatchId
+	c.OpStrs = EncodeOps(ops)
+	return nil
 }
 
 ////////////////////////////////////////

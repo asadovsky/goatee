@@ -34,7 +34,7 @@ func assert(b bool, v ...interface{}) {
 	}
 }
 
-func jsonMarshalOrPanic(v interface{}) string {
+func jsonMarshal(v interface{}) string {
 	b, err := json.Marshal(v)
 	ok(err)
 	return string(b)
@@ -77,74 +77,84 @@ func (h *hub) run() {
 	}
 }
 
-func (h *hub) processInitMsg(ws *websocket.Conn, m *common.Init, send chan string) {
-	h.mu.Lock()
-	s := &common.Snapshot{
-		Type:     "Snapshot",
-		ClientId: h.nextClientId,
-	}
-	if *useLogoot {
-		h.logoot.GetSnapshot(s)
-	} else {
-		h.text.GetSnapshot(s)
-	}
-	ok(websocket.Message.Send(ws, jsonMarshalOrPanic(s)))
-	h.nextClientId++
-	h.subscribe <- send
-	h.mu.Unlock()
+type stream struct {
+	h           *hub
+	ws          *websocket.Conn
+	send        chan string
+	initialized bool
+	isLogoot    bool
 }
 
-func (h *hub) processUpdateMsg(ws *websocket.Conn, m *common.Update) {
-	var c *common.Change
-	var err error
-	h.mu.Lock()
-	if *useLogoot {
-		c, err = h.logoot.ApplyUpdate(m)
-	} else {
-		c, err = h.text.ApplyUpdate(m)
+func (s *stream) processInitMsg(msg *common.Init) {
+	s.h.mu.Lock()
+	if s.initialized {
+		panic("already initialized")
 	}
-	h.mu.Unlock()
-	ok(err)
-	c.Type = "Change"
-	c.ClientId = m.ClientId
-	h.broadcast <- jsonMarshalOrPanic(c)
+	s.initialized = true
+	s.isLogoot = msg.DataType == "crdt.Logoot"
+	if !s.isLogoot {
+		assert(msg.DataType == "ot.Text")
+	}
+	sn := &common.Snapshot{
+		Type:     "Snapshot",
+		ClientId: s.h.nextClientId,
+	}
+	if s.isLogoot {
+		s.h.logoot.PopulateSnapshot(sn)
+	} else {
+		s.h.text.PopulateSnapshot(sn)
+	}
+	ok(websocket.Message.Send(s.ws, jsonMarshal(sn)))
+	s.h.nextClientId++
+	s.h.subscribe <- s.send
+	s.h.mu.Unlock()
+}
+
+func (s *stream) processUpdateMsg(msg *common.Update) {
+	s.h.mu.Lock()
+	if !s.initialized {
+		panic("not initialized")
+	}
+	ch := &common.Change{
+		Type:     "Change",
+		ClientId: msg.ClientId,
+	}
+	if s.isLogoot {
+		ok(s.h.logoot.ApplyUpdate(msg, ch))
+	} else {
+		ok(s.h.text.ApplyUpdate(msg, ch))
+	}
+	s.h.mu.Unlock()
+	s.h.broadcast <- jsonMarshal(ch)
 }
 
 func (h *hub) handleConn(ws *websocket.Conn) {
-	initialized := false
-	send := make(chan string)
+	s := &stream{h: h, ws: ws, send: make(chan string)}
 	eof, done := make(chan bool), make(chan bool)
 
 	go func() {
 		for {
-			var b []byte
-			if err := websocket.Message.Receive(ws, &b); err != nil {
+			var buf []byte
+			if err := websocket.Message.Receive(ws, &buf); err != nil {
 				if err == io.EOF {
 					eof <- true
 					return
 				}
 				ok(err)
 			}
-			var t common.MsgType
-			ok(json.Unmarshal(b, &t))
-			switch t.Type {
+			var mt common.MsgType
+			ok(json.Unmarshal(buf, &mt))
+			switch mt.Type {
 			case "Init":
-				if initialized {
-					panic("already initialized")
-				}
-				var m common.Init
-				ok(json.Unmarshal(b, &m))
-				h.processInitMsg(ws, &m, send)
-				initialized = true
+				var msg common.Init
+				ok(json.Unmarshal(buf, &msg))
+				s.processInitMsg(&msg)
 			case "Update":
-				if !initialized {
-					panic("not initialized")
-				}
-				var m common.Update
-				ok(json.Unmarshal(b, &m))
-				h.processUpdateMsg(ws, &m)
+				var msg common.Update
+				ok(json.Unmarshal(buf, &msg))
+				s.processUpdateMsg(&msg)
 			default:
-				panic(fmt.Errorf("unknown message type %q", t.Type))
+				panic(fmt.Errorf("unknown message type %q", mt.Type))
 			}
 		}
 	}()
@@ -152,7 +162,7 @@ func (h *hub) handleConn(ws *websocket.Conn) {
 	go func() {
 		for {
 			select {
-			case msg := <-send:
+			case msg := <-s.send:
 				ok(websocket.Message.Send(ws, msg))
 			case <-eof:
 				done <- true
@@ -161,14 +171,16 @@ func (h *hub) handleConn(ws *websocket.Conn) {
 		}
 	}()
 
-	log.Printf("WAIT %v", send)
+	log.Printf("WAIT %v", s.send)
 	<-done
-	log.Printf("EXIT %v", send)
+	log.Printf("EXIT %v", s.send)
 
-	if initialized {
-		h.unsubscribe <- send
+	h.mu.Lock()
+	if s.initialized {
+		h.unsubscribe <- s.send
 	}
-	close(send)
+	h.mu.Unlock()
+	close(s.send)
 	close(eof)
 	close(done)
 	ws.Close()

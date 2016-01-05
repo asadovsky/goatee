@@ -22,7 +22,8 @@ function Document(addr, docId, onDocLoaded) {
     }
     that.sendMsg_({
       Type: 'Init',
-      DocId: docId
+      DocId: docId,
+      DataType: 'crdt.Logoot'
     });
   };
 
@@ -67,17 +68,17 @@ Document.prototype.handleDelete = function(pos, len) {
 
 Document.prototype.processSnapshotMsg_ = function(msg) {
   console.assert(this.clientId_ === null);
-  this.clientId_ = msg['ClientId'];
+  this.clientId_ = msg.ClientId;
   // FIXME: Store Logoot metadata.
-  this.m_ = new AsyncModel(this, msg['Text']);
+  this.m_ = new AsyncModel(this, msg.Text);
 };
 
 Document.prototype.processChangeMsg_ = function(msg) {
-  var isLocal = msg['ClientId'] === this.clientId_;
+  var isLocal = msg.ClientId === this.clientId_;
 
   // Apply all mutations, regardless of whether they originated from this client
   // (i.e. unidirectional data flow).
-  var ops = text.decodeOps(msg['OpStrs']);
+  var ops = text.decodeOps(msg.OpStrs);
   for (var i = 0; i < ops.length; i++) {
     // FIXME: Update Logoot metadata.
     var op = ops[i];

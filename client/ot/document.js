@@ -38,7 +38,8 @@ function Document(addr, docId, onDocLoaded) {
     }
     that.sendMsg_({
       Type: 'Init',
-      DocId: docId
+      DocId: docId,
+      DataType: 'ot.Text'
     });
   };
 

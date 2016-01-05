@@ -7,8 +7,9 @@ type MsgType struct {
 
 // Sent from client to server.
 type Init struct {
-	Type  string // "Init"
-	DocId int
+	Type     string // "Init"
+	DocId    int
+	DataType string // "ot.Text" or "crdt.Logoot"
 }
 
 // Sent from server to client.

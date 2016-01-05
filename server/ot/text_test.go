@@ -138,9 +138,9 @@ func TestTextValue(t *testing.T) {
 
 func TestTextGetSnapshot(t *testing.T) {
 	var s common.Snapshot
-	ot.NewText("").GetSnapshot(&s)
+	ot.NewText("").PopulateSnapshot(&s)
 	eq(t, s, common.Snapshot{Text: "", BasePatchId: 0})
-	ot.NewText("foo").GetSnapshot(&s)
+	ot.NewText("foo").PopulateSnapshot(&s)
 	eq(t, s, common.Snapshot{Text: "foo", BasePatchId: 0})
 }
 
@@ -151,11 +151,11 @@ func TestTextApplyUpdate(t *testing.T) {
 		&ot.Insert{Pos: 2, Value: "seball"},
 		&ot.Delete{Pos: 8, Len: 1},
 	})
-	c, err := text.ApplyUpdate(&common.Update{
+	var c common.Change
+	ok(t, text.ApplyUpdate(&common.Update{
 		BasePatchId: 0,
 		OpStrs:      opStrs,
-	})
-	ok(t, err)
+	}, &c))
 	neq(t, c.PatchId, 0)
 	eq(t, c.OpStrs, opStrs)
 	eq(t, text.Value(), "baseball")
