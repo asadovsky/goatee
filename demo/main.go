@@ -18,6 +18,7 @@ import (
 var (
 	loopback = flag.Bool("loopback", true, "")
 	port     = flag.Int("port", 4000, "")
+	mode     = flag.String("mode", "ot", "")
 	serveFn  = gosh.Register("serve", hub.Serve)
 )
 
@@ -55,11 +56,11 @@ func main() {
 	addr := fmt.Sprintf("%s:%d", hostname, *port)
 	httpAddr := fmt.Sprintf("%s:8080", hostname)
 	c := sh.Fn(serveFn, addr)
-	c.AddStderrWriter(os.Stderr)
+	c.AddStderrWriter(gosh.NopWriteCloser(os.Stderr))
 	c.Start()
 	c.AwaitReady()
 	// Note, the "open" command doesn't support query strings in file urls.
-	fmt.Printf("http://%s/demo/index.html?mode=ot&addr=%s\n", httpAddr, url.QueryEscape(addr))
+	fmt.Printf("http://%s/demo/index.html?mode=%s&addr=%s\n", httpAddr, *mode, url.QueryEscape(addr))
 	ok(http.ListenAndServe(httpAddr, http.FileServer(http.Dir(filepath.Join(cwd)))))
 	c.Wait()
 }

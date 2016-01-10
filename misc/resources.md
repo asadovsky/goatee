@@ -27,6 +27,8 @@
   http://www.loria.fr/~ignatcla/pmwiki/pub/papers/IgnatECSCW15.pdf
 - Merging OT and CRDT algorithms (2015)
   https://hal.inria.fr/hal-00957167/document
+- Numerical invariants, bounded counter (2015)
+  http://arxiv.org/pdf/1503.09052.pdf
 
 # CRDT notes
 

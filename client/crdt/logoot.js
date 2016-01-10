@@ -1,10 +1,44 @@
 // Mirrors server/crdt/logoot.go.
+// Unlike logoot.go, here we only deal in encoded pids.
+// TODO: Shared, data-driven unit tests.
 
 'use strict';
 
+var _ = require('lodash');
 var inherits = require('inherits');
 
 var util = require('../util');
+
+function pidLess(a, b) {
+  for (var i = 0; i < a.Ids.length; i++) {
+    if (i === b.Ids.length) {
+      return false;
+    }
+    var va = a.Ids[i], vb = b.Ids[i];
+    if (va.Pos !== vb.Pos) {
+      return va.Pos < vb.Pos;
+    } else if (va.AgentId !== vb.AgentId) {
+      return va.AgentId < vb.AgentId;
+    }
+  }
+  return a.Ids.length < b.Ids.length;
+}
+
+function pidEncode(pid) {
+  return _.map(pid.Ids, function(id) {
+    return [id.Pos, id.AgentId].join('.');
+  }).join(':');
+}
+
+function decodePid(s) {
+  return {Ids: _.map(s.split(':'), function(idStr) {
+    var parts = idStr.split('.');
+    if (parts.length !== 2) {
+      throw new Error('invalid pid: ' + s);
+    }
+    return {Pos: Number(parts[0]), AgentId: Number(parts[1])};
+  })};
+}
 
 function Op() {}
 
@@ -12,15 +46,27 @@ Op.prototype.encode = function() {
   throw new Error('not implemented');
 };
 
+inherits(ClientInsert, Op);
+function ClientInsert(prevPid, nextPid, value) {
+  this.prevPid = prevPid;
+  this.nextPid = nextPid;
+  this.value = value;
+}
+
+ClientInsert.prototype.encode = function() {
+  var prevPid = this.prevPid ? pidEncode(this.prevPid) : '';
+  var nextPid = this.nextPid ? pidEncode(this.nextPid) : '';
+  return ['ci', prevPid, nextPid, this.value].join(',');
+};
+
 inherits(Insert, Op);
-function Insert(pid, value, nextPid) {
+function Insert(pid, value) {
   this.pid = pid;
   this.value = value;
-  this.nextPid = nextPid || '';
 }
 
 Insert.prototype.encode = function() {
-  return ['i', this.pid, this.nextPid, this.value].join(',');
+  return ['i', pidEncode(this.pid), this.value].join(',');
 };
 
 inherits(Delete, Op);
@@ -29,31 +75,37 @@ function Delete(pid) {
 }
 
 Delete.prototype.encode = function() {
-  return ['d', this.pid].join(',');
+  return ['d', pidEncode(this.pid)].join(',');
 };
 
 function newParseError(s) {
-  return new Error('failed to parse op "' + s + '"');
+  return new Error('failed to parse op: ' + s);
 }
 
 function decodeOp(s) {
   var parts;
-  var t = s.split(',', 1);
+  var t = s.split(',', 1)[0];
   switch (t) {
-  case 'i':
+  case 'ci':
     parts = util.splitN(s, ',', 4);
+    if (parts.length < 4) {
+      throw newParseError(s);
+    }
+    return new ClientInsert(decodePid(parts[1]), decodePid(parts[2]), parts[3]);
+  case 'i':
+    parts = util.splitN(s, ',', 3);
     if (parts.length < 3) {
       throw newParseError(s);
     }
-    return new Insert(parts[1], parts[3], parts[2]);
+    return new Insert(decodePid(parts[1]), parts[2]);
   case 'd':
     parts = util.splitN(s, ',', 2);
     if (parts.length < 2) {
       throw newParseError(s);
     }
-    return new Delete(parts[1]);
+    return new Delete(decodePid(parts[1]));
   default:
-    throw new Error('unknown op type "' + t + '"');
+    throw new Error('unknown op type: ' + t);
   }
 }
 
@@ -73,9 +125,44 @@ function decodeOps(strs) {
   return ops;
 }
 
+function Logoot(atoms) {
+  this.atoms_ = atoms;
+}
+
+function decodeLogoot(s) {
+  return new Logoot(JSON.parse(s));
+}
+
+Logoot.prototype.pid = function(i) {
+  return this.atoms_[i].Pid;
+};
+
+Logoot.prototype.applyInsert = function(op) {
+  var p = this.search_(op.pid);
+  this.atoms_.splice(p, 0, {Pid: op.pid, Value: op.value});
+  return p;
+};
+
+Logoot.prototype.applyDelete = function(op) {
+  var p = this.search_(op.pid);
+  this.atoms_.splice(p, 1);
+  return p;
+};
+
+Logoot.prototype.search_ = function(pid) {
+  // TODO: Binary search.
+  for (var i = 0; i < this.atoms_.length; i++) {
+    if (!pidLess(this.atoms_[i].Pid, pid)) return i;
+  }
+  return this.atoms_.length;
+};
+
 module.exports = {
+  ClientInsert: ClientInsert,
   Insert: Insert,
   Delete: Delete,
   encodeOps: encodeOps,
-  decodeOps: decodeOps
+  decodeOps: decodeOps,
+  Logoot: Logoot,
+  decodeLogoot: decodeLogoot
 };

@@ -1,5 +1,4 @@
 // Mirrors server/ot/text.go.
-//
 // TODO: Shared, data-driven unit tests.
 
 'use strict';
@@ -37,7 +36,7 @@ Delete.prototype.encode = function() {
 function decodeOp(s) {
   var parts = util.splitN(s, ',', 3);
   if (parts.length < 3) {
-    throw new Error('failed to parse op "' + s + '"');
+    throw new Error('failed to parse op: ' + s);
   }
   var pos = Number(parts[1]);
   var t = parts[0];
@@ -47,7 +46,7 @@ function decodeOp(s) {
   case 'd':
     return new Delete(pos, Number(parts[2]));
   default:
-    throw new Error('unknown op type "' + t + '"');
+    throw new Error('unknown op type: ' + t);
   }
 }
 

@@ -31,6 +31,10 @@ build: dist/ot.min.js
 dist/ot.min.js: client/ot/index.js $(shell find client) node_modules
 	$(call BROWSERIFY_STANDALONE,$<,$@,ot)
 
+build: dist/crdt.min.js
+dist/crdt.min.js: client/crdt/index.js $(shell find client) node_modules
+	$(call BROWSERIFY_STANDALONE,$<,$@,crdt)
+
 build: dist/demo.min.js
 dist/demo.min.js: demo/index.js node_modules
 	$(call BROWSERIFY,$<,$@)
@@ -52,7 +56,11 @@ demo-local: build
 
 .PHONY: demo-ot
 demo-ot: build
-	dist/demo -port=4000 | xargs -n 1 -t open
+	dist/demo -port=4000 -mode=ot | xargs -n 1 -t open
+
+.PHONY: demo-crdt
+demo-crdt: build
+	dist/demo -port=4000 -mode=crdt | xargs -n 1 -t open
 
 ########################################
 # Test, clean, and lint

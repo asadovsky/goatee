@@ -35,7 +35,7 @@ func (op *Insert) Apply(s string) (string, error) {
 	if op.Pos < 0 || op.Pos > len(s) {
 		return "", errors.New("insert out of bounds")
 	}
-	return s[0:op.Pos] + op.Value + s[op.Pos:], nil
+	return s[:op.Pos] + op.Value + s[op.Pos:], nil
 }
 
 // Delete represents a text deletion.
@@ -52,14 +52,14 @@ func (op *Delete) Apply(s string) (string, error) {
 	if op.Pos < 0 || op.Pos+op.Len > len(s) {
 		return "", errors.New("delete out of bounds")
 	}
-	return s[0:op.Pos] + s[op.Pos+op.Len:], nil
+	return s[:op.Pos] + s[op.Pos+op.Len:], nil
 }
 
 // DecodeOp returns an Op given an encoded op.
 func DecodeOp(s string) (Op, error) {
 	parts := strings.SplitN(s, ",", 3)
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("failed to parse op %q", s)
+		return nil, fmt.Errorf("failed to parse op: %s", s)
 	}
 	pos, err := strconv.Atoi(parts[1])
 	if err != nil {
@@ -76,7 +76,7 @@ func DecodeOp(s string) (Op, error) {
 		}
 		return &Delete{pos, length}, nil
 	default:
-		return nil, fmt.Errorf("unknown op type %q", t)
+		return nil, fmt.Errorf("unknown op type: %s", t)
 	}
 }
 
@@ -189,9 +189,10 @@ func (t *Text) Value() string {
 }
 
 // PopulateSnapshot populates s.
-func (t *Text) PopulateSnapshot(s *common.Snapshot) {
+func (t *Text) PopulateSnapshot(s *common.Snapshot) error {
 	s.BasePatchId = t.lastPatchId
 	s.Text = t.value
+	return nil
 }
 
 // ApplyUpdate applies u and populates c.

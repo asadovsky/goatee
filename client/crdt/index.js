@@ -5,9 +5,9 @@
 /* global Document: true */
 var Document = require('./document');
 
-function load(addr, docId, onDocLoaded) {
+function load(addr, docId, onLoad) {
   /* jshint nonew: false */
-  new Document(addr, docId, onDocLoaded);
+  new Document(addr, docId, onLoad);
 }
 
 module.exports = {

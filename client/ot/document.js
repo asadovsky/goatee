@@ -11,13 +11,13 @@
 
 var AsyncModel = require('../editor').AsyncModel;
 var text = require('./text');
+var util = require('../util');
 
 module.exports = Document;
 
 // Similar to gapi.drive.realtime.Document.
-function Document(addr, docId, onDocLoaded) {
+function Document(addr, docId, onLoad) {
   var that = this;
-  this.socket_ = new WebSocket('ws://' + addr);
 
   // Initialized by processSnapshotMsg_.
   this.clientId_ = null;
@@ -32,40 +32,33 @@ function Document(addr, docId, onDocLoaded) {
   this.sentClientOpIdx_ = -1;
   this.ackedClientOpIdx_ = -1;
 
-  this.socket_.onopen = function(e) {
-    if (process.env.DEBUG_SOCKET) {
-      console.log('socket.open');
-    }
-    that.sendMsg_({
+  // Initialize WebSocket connection.
+  var ws = new WebSocket('ws://' + addr);
+
+  ws.onopen = function(e) {
+    that.ws_.sendMessage({
       Type: 'Init',
       DocId: docId,
       DataType: 'ot.Text'
     });
   };
 
-  this.socket_.onclose = function(e) {
-    if (process.env.DEBUG_SOCKET) {
-      console.log('socket.close');
-    }
-  };
-
-  this.socket_.onmessage = function(e) {
-    if (process.env.DEBUG_SOCKET) {
-      console.log('socket.recv: ' + e.data);
-    }
+  ws.onmessage = function(e) {
     var msg = JSON.parse(e.data);
     switch (msg.Type) {
     case 'Snapshot':
       that.processSnapshotMsg_(msg);
-      onDocLoaded(that);
+      onLoad(that);
       return;
     case 'Change':
       that.processChangeMsg_(msg);
       return;
     default:
-      throw new Error('unknown message type "' + msg.Type + '"');
+      throw new Error('unknown message type: ' + msg.Type);
     }
   };
+
+  this.ws_ = util.decorateWebSocket(ws);
 }
 
 Document.prototype.getCollaborators = function() {
@@ -140,30 +133,14 @@ Document.prototype.processChangeMsg_ = function(msg) {
 ////////////////////////////////////////
 // Other private helpers
 
-Document.prototype.sendMsg_ = function(msg) {
-  var that = this;
-  function send() {
-    var json = JSON.stringify(msg);
-    if (process.env.DEBUG_SOCKET) {
-      console.log('socket.send: ' + json);
-    }
-    that.socket_.send(json);
-  }
-  if (process.env.DEBUG_DELAY) {
-    window.setTimeout(send, Number(process.env.DEBUG_DELAY));
-  } else {
-    send();
-  }
-};
-
 Document.prototype.sendBufferedOps_ = function() {
   console.assert(this.sentClientOpIdx_ === this.ackedClientOpIdx_);
   if (this.sentClientOpIdx_ === this.clientOps_.length - 1) {
     return;  // no ops to send
   }
   this.sentClientOpIdx_ = this.clientOps_.length - 1;
-  // TODO: Compress ops (e.g. combine insertions) before sending.
-  this.sendMsg_({
+  // TODO: Compact ops (e.g. combine insertions) before sending.
+  this.ws_.sendMessage({
     Type: 'Update',
     ClientId: this.clientId_,
     BasePatchId: this.basePatchId_,

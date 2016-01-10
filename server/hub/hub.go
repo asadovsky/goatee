@@ -2,7 +2,6 @@ package hub
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -18,10 +17,6 @@ import (
 	"github.com/asadovsky/goatee/server/ot"
 )
 
-var (
-	useLogoot = flag.Bool("use-logoot", false, "")
-)
-
 func ok(err error) {
 	if err != nil {
 		panic(err)
@@ -35,9 +30,9 @@ func assert(b bool, v ...interface{}) {
 }
 
 func jsonMarshal(v interface{}) string {
-	b, err := json.Marshal(v)
+	buf, err := json.Marshal(v)
 	ok(err)
-	return string(b)
+	return string(buf)
 }
 
 type hub struct {
@@ -154,7 +149,7 @@ func (h *hub) handleConn(ws *websocket.Conn) {
 				ok(json.Unmarshal(buf, &msg))
 				s.processUpdateMsg(&msg)
 			default:
-				panic(fmt.Errorf("unknown message type %q", mt.Type))
+				panic(fmt.Errorf("unknown message type: %s", mt.Type))
 			}
 		}
 	}()
