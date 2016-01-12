@@ -17,6 +17,10 @@ function Model(initialText) {
   this.selEnd_ = 0;
 }
 
+Model.prototype.paused = function() {
+  return false;
+};
+
 Model.prototype.getText = function() {
   return this.text_;
 };

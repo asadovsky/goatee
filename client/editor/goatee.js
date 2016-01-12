@@ -287,6 +287,10 @@ Editor.prototype.getCursorPos_ = function() {
 
 // Updates state given p (offset), then renders selection.
 Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
+  if (this.m_.paused()) {
+    return;
+  }
+
   this.cursor_.prevLeft = null;
   this.cursor_.append = false;
 
@@ -300,6 +304,10 @@ Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
 // Updates state given row and x position (in pixels), then renders selection.
 // Assumes linePOffsets_, lineYOffsets_, and charSizes_ are up-to-date.
 Editor.prototype.setSelectionFromRowAndX_ = function(row, x, updateSelStart, clearPrevLeft) {  // jshint ignore: line
+  if (this.m_.paused()) {
+    return;
+  }
+
   // Find char whose left is closest to x.
   var beginEnd = this.linePOffsets_[row];
   var pEnd = beginEnd[1];
@@ -352,6 +360,9 @@ Editor.prototype.makeLineHtml_ = function(text, p) {
 };
 
 Editor.prototype.insertText_ = function(p, value) {
+  if (this.m_.paused()) {
+    return;
+  }
   value = util.canonicalizeLineBreaks(value);
   this.cursor_.append = false;
   this.cursor_.prevLeft = null;
@@ -359,6 +370,9 @@ Editor.prototype.insertText_ = function(p, value) {
 };
 
 Editor.prototype.deleteText_ = function(p, len) {
+  if (this.m_.paused()) {
+    return;
+  }
   this.cursor_.append = false;
   this.cursor_.prevLeft = null;
   this.m_.deleteText(p, len);

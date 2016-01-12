@@ -51,8 +51,6 @@ Document.prototype.getModel = function() {
 ////////////////////////////////////////
 // Model event handlers
 
-// FIXME: In both handleInsert and handleDelete, block (i.e. do not return)
-// until the server acks the op.
 Document.prototype.handleInsert = function(pos, value) {
   console.assert(value.length === 1);
   var prevPid = pos === 0 ? '' : this.logoot_.pid(pos - 1);
@@ -88,10 +86,10 @@ Document.prototype.processChangeMsg_ = function(msg) {
     var op = ops[i];
     switch(op.constructor.name) {
     case 'Insert':
-      this.m_.applyInsert(this.logoot_.applyInsert(op), op.value, isLocal);
+      this.m_.applyInsert(isLocal, this.logoot_.applyInsert(op), op.value);
       break;
     case 'Delete':
-      this.m_.applyDelete(this.logoot_.applyDelete(op), 1, isLocal);
+      this.m_.applyDelete(isLocal, this.logoot_.applyDelete(op), 1);
       break;
     default:
       throw new Error(op.constructor.name);

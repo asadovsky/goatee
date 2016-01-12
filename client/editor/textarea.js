@@ -69,6 +69,7 @@ Editor.prototype.reset = function(model) {
   var handler = this.handleModifyText_.bind(this);
   this.m_.on('insertText', handler);
   this.m_.on('deleteText', handler);
+  this.m_.on('setSelectionRange', this.handleSetSelectionRange_.bind(this));
 
   // Handle non-empty initial model state.
   this.ta_.value = this.m_.getText();
@@ -94,9 +95,18 @@ Editor.prototype.getSelectionRange = function() {
 // Model event handlers
 
 Editor.prototype.handleModifyText_ = function(e) {
-  if (e.isLocal) return;
+  if (e.isLocal) {
+    return;
+  }
   this.ta_.value = this.m_.getText();
-  // If this editor has focus, update its selection/cursor position.
+  this.handleSetSelectionRange_(e);
+};
+
+Editor.prototype.handleSetSelectionRange_ = function(e) {
+  if (e.isLocal) {
+    return;
+  }
+  // If this editor has focus, update its selection range.
   if (document.activeElement === this.ta_) {
     var selRange = this.m_.getSelectionRange();
     this.ta_.setSelectionRange(Math.min(selRange[0], selRange[1]),
@@ -108,6 +118,11 @@ Editor.prototype.handleModifyText_ = function(e) {
 // Input event handlers
 
 Editor.prototype.handleInput_ = function(e) {
+  if (this.m_.paused()) {
+    e.preventDefault();
+    return;
+  }
+
   var oldText = this.m_.getText();
   var newText = util.canonicalizeLineBreaks(this.ta_.value);
 
@@ -128,7 +143,11 @@ Editor.prototype.handleInput_ = function(e) {
   if (deleteLen > 0) this.m_.deleteText(l, deleteLen);
 };
 
-Editor.prototype.updateSelection_ = function() {
+Editor.prototype.updateSelection_ = function(e) {
+  if (this.m_.paused()) {
+    e.preventDefault();
+    return;
+  }
   var that = this;
   window.setTimeout(function() {
     // TODO: Canonicalize line breaks.

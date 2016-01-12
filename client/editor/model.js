@@ -12,6 +12,12 @@ function Model() {
   EventEmitter.call(this);
 }
 
+// If the model is paused, insertText, deleteText, and setSelectionRange will
+// throw an exception.
+Model.prototype.paused = function() {
+  throw new Error('not implemented');
+};
+
 Model.prototype.getText = function() {
   throw new Error('not implemented');
 };

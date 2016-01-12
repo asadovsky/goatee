@@ -73,12 +73,12 @@ Document.prototype.getModel = function() {
 // Model event handlers
 
 Document.prototype.handleInsert = function(pos, value) {
-  this.m_.applyInsert(pos, value);
+  this.m_.applyInsert(true, pos, value);
   this.pushOp_(new text.Insert(pos, value));
 };
 
 Document.prototype.handleDelete = function(pos, len) {
-  this.m_.applyDelete(pos, len);
+  this.m_.applyDelete(true, pos, len);
   this.pushOp_(new text.Delete(pos, len));
 };
 
@@ -119,10 +119,10 @@ Document.prototype.processChangeMsg_ = function(msg) {
     var op = ops[i];
     switch (op.constructor.name) {
     case 'Insert':
-      this.m_.applyInsert(op.pos, op.value, false);
+      this.m_.applyInsert(false, op.pos, op.value);
       break;
     case 'Delete':
-      this.m_.applyDelete(op.pos, op.len, false);
+      this.m_.applyDelete(false, op.pos, op.len);
       break;
     default:
       throw new Error(op.constructor.name);

@@ -14,12 +14,17 @@ module.exports = Model;
 // gapi.drive.realtime.CollaborativeString.
 function Model(handler, initialText) {
   ModelInterface.call(this);
+  this.paused_ = false;
   this.handler_ = handler;
   // Note, we assume line breaks have been canonicalized to \n.
   this.text_ = initialText || '';
   this.selStart_ = 0;
   this.selEnd_ = 0;
 }
+
+Model.prototype.paused = function() {
+  return this.paused_;
+};
 
 Model.prototype.getText = function() {
   return this.text_;
@@ -30,26 +35,49 @@ Model.prototype.getSelectionRange = function() {
 };
 
 Model.prototype.insertText = function(pos, value) {
-  if (value.length === 0) return;
+  if (this.paused_) {
+    throw new Error('paused');
+  }
+  if (value.length === 0) {
+    return;
+  }
+  this.paused_ = true;
   this.handler_.handleInsert(pos, value);
 };
 
 Model.prototype.deleteText = function(pos, len) {
-  if (len === 0) return;
+  if (this.paused_) {
+    throw new Error('paused');
+  }
+  if (len === 0) {
+    return;
+  }
+  this.paused_ = true;
   this.handler_.handleDelete(pos, len);
 };
 
 Model.prototype.setSelectionRange = function(start, end) {
-  if (this.selStart_ === start && this.selEnd_ === end) return;
-  // TODO: Notify handler. For now, we simply update local state and emit an
-  // event.
+  if (this.paused_) {
+    throw new Error('paused');
+  }
+  if (this.selStart_ === start && this.selEnd_ === end) {
+    return;
+  }
+  // TODO: Set this.paused_ and notify handler. For now, we simply update local
+  // state and emit an event.
   this.selStart_ = start;
   this.selEnd_ = end;
   this.emit('setSelectionRange', new ev.SetSelectionRange(true, start, end));
 };
 
-Model.prototype.applyInsert = function(pos, value, isLocal) {
+Model.prototype.applyInsert = function(isLocal, pos, value) {
+  if (isLocal) {
+    this.paused_ = false;
+  }
   var t = this.text_;
+  if (pos < 0 || pos > t.length) {
+    throw new Error('insert out of bounds');
+  }
   this.text_ = t.substr(0, pos) + value + t.substr(pos);
   // Update selection range.
   if (isLocal) {
@@ -66,9 +94,14 @@ Model.prototype.applyInsert = function(pos, value, isLocal) {
   this.emit('insertText', new ev.InsertText(isLocal, pos, value));
 };
 
-Model.prototype.applyDelete = function(pos, len, isLocal) {
+Model.prototype.applyDelete = function(isLocal, pos, len) {
+  if (isLocal) {
+    this.paused_ = false;
+  }
   var t = this.text_;
-  console.assert(pos + len <= t.length, 'Delete past end');
+  if (pos < 0 || pos + len > t.length) {
+    throw new Error('delete out of bounds');
+  }
   this.text_ = t.substr(0, pos) + t.substr(pos + len);
   // Update selection range.
   if (isLocal) {
