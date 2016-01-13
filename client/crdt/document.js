@@ -51,17 +51,18 @@ Document.prototype.getModel = function() {
 ////////////////////////////////////////
 // Model event handlers
 
-Document.prototype.handleInsert = function(pos, value) {
-  console.assert(value.length === 1);
-  var prevPid = pos === 0 ? '' : this.logoot_.pid(pos - 1);
-  var nextPid = pos === this.m_.getText().length ? '' : this.logoot_.pid(pos);
-  this.sendOps_([new logoot.ClientInsert(prevPid, nextPid, value)]);
-};
-
-Document.prototype.handleDelete = function(pos, len) {
+Document.prototype.handleReplaceText = function(pos, len, value) {
   var ops = new Array(len);
   for (var i = 0; i < len; i++) {
     ops[i] = new logoot.Delete(this.logoot_.pid(pos + i));
+  }
+  if (value) {
+    var prevPid = pos === 0 ? '' : this.logoot_.pid(pos - 1);
+    var nextPid = '';
+    if (pos + len < this.logoot_.len()) {
+      nextPid = this.logoot_.pid(pos + len);
+    }
+    ops.push(new logoot.ClientInsert(prevPid, nextPid, value));
   }
   this.sendOps_(ops);
 };
@@ -84,12 +85,15 @@ Document.prototype.processChangeMsg_ = function(msg) {
   var ops = logoot.decodeOps(msg.OpStrs);
   for (var i = 0; i < ops.length; i++) {
     var op = ops[i];
+    var pos;
     switch(op.constructor.name) {
     case 'Insert':
-      this.m_.applyInsert(isLocal, this.logoot_.applyInsert(op), op.value);
+      pos = this.logoot_.applyInsertText(op);
+      this.m_.applyReplaceText(isLocal, pos, 0, op.value);
       break;
     case 'Delete':
-      this.m_.applyDelete(isLocal, this.logoot_.applyDelete(op), 1);
+      pos = this.logoot_.applyDeleteText(op);
+      this.m_.applyReplaceText(isLocal, pos, 1, '');
       break;
     default:
       throw new Error(op.constructor.name);
@@ -101,6 +105,9 @@ Document.prototype.processChangeMsg_ = function(msg) {
 // Other private helpers
 
 Document.prototype.sendOps_ = function(ops) {
+  if (!ops.length) {
+    return;
+  }
   this.ws_.sendMessage({
     Type: 'Update',
     ClientId: this.clientId_,

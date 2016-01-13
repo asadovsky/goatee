@@ -12,21 +12,13 @@ function Base(isLocal) {
   this.isLocal = isLocal;
 }
 
-// Similar to gapi.drive.realtime.TextInsertedEvent.
-function InsertText(isLocal, pos, value) {
-  Base.call(this, isLocal);
-  this.pos = pos;
-  this.value = value;
-}
-inherits(InsertText, Base);
-
-// Similar to gapi.drive.realtime.TextDeletedEvent.
-function DeleteText(isLocal, pos, len) {
+function ReplaceText(isLocal, pos, len, value) {
   Base.call(this, isLocal);
   this.pos = pos;
   this.len = len;
+  this.value = value;
 }
-inherits(DeleteText, Base);
+inherits(ReplaceText, Base);
 
 function SetSelectionRange(isLocal, start, end) {
   Base.call(this, isLocal);
@@ -36,7 +28,6 @@ function SetSelectionRange(isLocal, start, end) {
 inherits(SetSelectionRange, Base);
 
 module.exports = {
-  InsertText: InsertText,
-  DeleteText: DeleteText,
+  ReplaceText: ReplaceText,
   SetSelectionRange: SetSelectionRange
 };

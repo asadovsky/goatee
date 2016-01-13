@@ -42,7 +42,7 @@ function Cursor() {
   // If true, cursor should be rendered to the right of the char at offset p-1
   // rather than at the left edge of the char at offset p. This can happen when
   // user presses the "end" key or clicks past the end of a line.
-  this.append = false;
+  this.rightEnd = false;
 
   // Used for tracking previous left position in pixels, needed to implement
   // up/down arrows.
@@ -121,8 +121,7 @@ Editor.prototype.reset = function(model) {
   this.m_ = model || new LocalModel();
 
   // Register model event handlers.
-  this.m_.on('insertText', this.handleInsertText_.bind(this));
-  this.m_.on('deleteText', this.handleDeleteText_.bind(this));
+  this.m_.on('replaceText', this.handleReplaceText_.bind(this));
   this.m_.on('setSelectionRange', this.handleSetSelectionRange_.bind(this));
 
   // Note: Internal UI state (e.g. charSizes_, linePOffsets_) lives in Editor,
@@ -188,19 +187,19 @@ Editor.prototype.getSelectionRange = function() {
 ////////////////////////////////////////////////////////////////////////////////
 // Model event handlers
 
-Editor.prototype.handleInsertText_ = function(e) {
+Editor.prototype.handleReplaceText_ = function(e) {
+  this.cursor_.rightEnd = false;
+  this.cursor_.prevLeft = null;
+
   var valueCharSizes = new Array(e.value.length);
   for (var i = 0; i < e.value.length; i++) {
     var c = e.value.charAt(i);
     valueCharSizes[i] = this.charSize_(c, e.pos + i);
   }
-  this.charSizes_ = this.charSizes_.slice(0, e.pos).concat(
-    valueCharSizes, this.charSizes_.slice(e.pos));
-  this.renderAll_(e.isLocal);
-};
+  Array.prototype.splice.apply(this.charSizes_, [
+    e.pos, e.len
+  ].concat(valueCharSizes));
 
-Editor.prototype.handleDeleteText_ = function(e) {
-  this.charSizes_.splice(e.pos, e.len);
   this.renderAll_(e.isLocal);
 };
 
@@ -292,7 +291,7 @@ Editor.prototype.setSelectionFromP_ = function(p, updateSelStart) {
   }
 
   this.cursor_.prevLeft = null;
-  this.cursor_.append = false;
+  this.cursor_.rightEnd = false;
 
   if (!updateSelStart) {
     this.m_.setSelectionRange(this.m_.getSelectionRange()[0], p);
@@ -326,8 +325,8 @@ Editor.prototype.setSelectionFromRowAndX_ = function(row, x, updateSelStart, cle
 
   if (clearPrevLeft) this.cursor_.prevLeft = null;
   // If the character at position p is actually on the next line, switch cursor
-  // state to "append" mode.
-  this.cursor_.append = (p === beginEnd[1] && p > beginEnd[0]);
+  // state to "rightEnd" mode.
+  this.cursor_.rightEnd = (p === beginEnd[1] && p > beginEnd[0]);
 
   if (!updateSelStart) {
     this.m_.setSelectionRange(this.m_.getSelectionRange()[0], p);
@@ -360,28 +359,37 @@ Editor.prototype.makeLineHtml_ = function(text, p) {
 };
 
 Editor.prototype.insertText_ = function(p, value) {
-  if (this.m_.paused()) {
-    return;
-  }
-  value = util.canonicalizeLineBreaks(value);
-  this.cursor_.append = false;
-  this.cursor_.prevLeft = null;
-  this.m_.insertText(p, value);
+  return this.replaceText_(p, 0, value);
 };
 
 Editor.prototype.deleteText_ = function(p, len) {
+  return this.replaceText_(p, len, '');
+};
+
+Editor.prototype.replaceText_ = function(p, len, value) {
   if (this.m_.paused()) {
     return;
   }
-  this.cursor_.append = false;
-  this.cursor_.prevLeft = null;
-  this.m_.deleteText(p, len);
+  this.m_.replaceText(p, len, util.canonicalizeLineBreaks(value));
 };
 
 Editor.prototype.deleteSelection_ = function() {
   var sel = this.getSelectionOrNull_();
   console.assert(sel !== null);
   this.deleteText_(sel[0], sel[1] - sel[0]);
+};
+
+Editor.prototype.replaceSelection_ = function(value) {
+  var sel = this.getSelectionOrNull_();
+  var p, len;
+  if (sel !== null) {
+    p = sel[0];
+    len = sel[1] - sel[0];
+  } else {
+    p = this.m_.getSelectionRange()[0];
+    len = 0;
+  }
+  this.replaceText_(p, len, value);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -391,10 +399,10 @@ Editor.prototype.computeCursorRowAndLeft_ = function() {
   var numRows = this.linePOffsets_.length;
   var selEnd = this.m_.getSelectionRange()[1];
   var p, row = 0;
-  // TODO: Use binary search.
+  // TODO: Binary search.
   for (; row < numRows - 1; row++) {
     p = this.linePOffsets_[row][1];
-    if (selEnd < p || (selEnd === p && this.cursor_.append)) break;
+    if (selEnd < p || (selEnd === p && this.cursor_.rightEnd)) break;
   }
   var left = 0;
   for (p = this.linePOffsets_[row][0]; p < selEnd; p++) {
@@ -596,10 +604,8 @@ Editor.prototype.handleKeyPress_ = function(e) {
   if (IGNORED_KEYPRESS_CODES[e.which]) return;
   if (e.which > 127) return;  // require ASCII for now
   e.preventDefault();
-  if (this.getSelectionOrNull_() !== null) this.deleteSelection_();
 
-  var p = this.getCursorPos_();
-  this.insertText_(p, String.fromCharCode(e.which));
+  this.replaceSelection_(String.fromCharCode(e.which));
 };
 
 Editor.prototype.handleKeyDown_ = function(e) {
@@ -611,10 +617,10 @@ Editor.prototype.handleKeyDown_ = function(e) {
     var c = String.fromCharCode(e.which);
     switch (c) {
     case 'V':
-      if (sel !== null) this.deleteSelection_();
-      this.insertText_(this.getCursorPos_(), this.clipboard_);
+      this.replaceSelection_(this.clipboard_);
       break;
     case 'A':
+      // TODO: Atomic update.
       this.setSelectionFromP_(0, true);
       this.setSelectionFromP_(this.m_.getText().length, false);
       break;

@@ -66,9 +66,7 @@ Editor.prototype.reset = function(model) {
   this.m_ = model || new LocalModel();
 
   // Register model event handlers.
-  var handler = this.handleModifyText_.bind(this);
-  this.m_.on('insertText', handler);
-  this.m_.on('deleteText', handler);
+  this.m_.on('replaceText', this.handleReplaceText_.bind(this));
   this.m_.on('setSelectionRange', this.handleSetSelectionRange_.bind(this));
 
   // Handle non-empty initial model state.
@@ -94,7 +92,7 @@ Editor.prototype.getSelectionRange = function() {
 ////////////////////////////////////////////////////////////////////////////////
 // Model event handlers
 
-Editor.prototype.handleModifyText_ = function(e) {
+Editor.prototype.handleReplaceText_ = function(e) {
   if (e.isLocal) {
     return;
   }
@@ -139,8 +137,7 @@ Editor.prototype.handleInput_ = function(e) {
   console.assert(insertLen >= 0, insertLen);
   console.assert(deleteLen >= 0, deleteLen);
 
-  if (insertLen > 0) this.m_.insertText(l, newText.substr(l, insertLen));
-  if (deleteLen > 0) this.m_.deleteText(l, deleteLen);
+  this.m_.replaceText(l, deleteLen, newText.substr(l, insertLen));
 };
 
 Editor.prototype.updateSelection_ = function(e) {
@@ -151,6 +148,6 @@ Editor.prototype.updateSelection_ = function(e) {
   var that = this;
   window.setTimeout(function() {
     // TODO: Canonicalize line breaks.
-    that.m_.setSelectionRange(that.el_.selectionStart, that.el_.selectionEnd);
+    that.m_.setSelectionRange(that.ta_.selectionStart, that.ta_.selectionEnd);
   }, 0);
 };

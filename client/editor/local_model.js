@@ -29,18 +29,11 @@ Model.prototype.getSelectionRange = function() {
   return [this.selStart_, this.selEnd_];
 };
 
-Model.prototype.insertText = function(pos, value) {
-  this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos);
+Model.prototype.replaceText = function(pos, len, value) {
+  this.text_ = this.text_.substr(0, pos) + value + this.text_.substr(pos + len);
   this.selStart_ = pos + value.length;
   this.selEnd_ = this.selStart_;
-  this.emit('insertText', new ev.InsertText(true, pos, value));
-};
-
-Model.prototype.deleteText = function(pos, len) {
-  this.text_ = this.text_.substr(0, pos) + this.text_.substr(pos + len);
-  this.selStart_ = pos;
-  this.selEnd_ = this.selStart_;
-  this.emit('deleteText', new ev.DeleteText(true, pos, len));
+  this.emit('replaceText', new ev.ReplaceText(true, pos, len, value));
 };
 
 Model.prototype.setSelectionRange = function(start, end) {

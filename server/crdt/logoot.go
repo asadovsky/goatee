@@ -41,7 +41,7 @@ func assert(b bool, v ...interface{}) {
 // 3. Client speaks Logoot (e.g. using GopherJS)
 //    - Note, we would need to distinguish between clients talking concurrently
 //      to the same server
-// 4. Client-server OT.
+// 4. Client-server OT
 //
 // For now, we go with approach #2. If unidirectional data flow proves too slow,
 // we'll likely need to switch to approach #3 or #4.
@@ -272,25 +272,32 @@ func (l *Logoot) ApplyUpdate(u *common.Update, c *common.Change) error {
 	if err != nil {
 		return err
 	}
+	appliedOps := make([]Op, 0, len(ops))
 	gotClientInsert := false
-	for i, op := range ops {
+	for _, op := range ops {
 		switch v := op.(type) {
 		case *ClientInsert:
 			if gotClientInsert {
 				return errors.New("cannot have multiple ClientInsert ops")
 			}
 			gotClientInsert = true
-			// FIXME: Handle the case where v.Value contains multiple characters.
-			x := &Insert{genPid(u.ClientId, v.PrevPid, v.NextPid), v.Value}
-			ops[i] = x
-			l.applyInsert(x)
+			// TODO: Smarter PID allocation.
+			prevPid := v.PrevPid
+			for j := 0; j < len(v.Value); j++ {
+				x := &Insert{genPid(u.ClientId, prevPid, v.NextPid), string(v.Value[j])}
+				l.applyInsertText(x)
+				appliedOps = append(appliedOps, x)
+				prevPid = x.Pid
+			}
 		case *Insert:
-			l.applyInsert(v)
+			l.applyInsertText(v)
+			appliedOps = append(appliedOps, op)
 		case *Delete:
-			l.applyDelete(v)
+			l.applyDeleteText(v)
+			appliedOps = append(appliedOps, op)
 		}
 	}
-	c.OpStrs = EncodeOps(ops)
+	c.OpStrs = EncodeOps(appliedOps)
 	return nil
 }
 
@@ -336,7 +343,7 @@ func genPid(agentId int, prev, next *Pid) *Pid {
 	return &Pid{Ids: genIds(agentId, prevIds, nextIds)}
 }
 
-func (l *Logoot) applyInsert(op *Insert) {
+func (l *Logoot) applyInsertText(op *Insert) {
 	a := l.atoms
 	p := l.search(op.Pid)
 	if p != len(a) && a[p].Pid.Equal(op.Pid) {
@@ -351,7 +358,7 @@ func (l *Logoot) applyInsert(op *Insert) {
 	l.value = l.value[:p] + op.Value + l.value[p:]
 }
 
-func (l *Logoot) applyDelete(op *Delete) {
+func (l *Logoot) applyDeleteText(op *Delete) {
 	a := l.atoms
 	p := l.search(op.Pid)
 	if p == len(a) || !a[p].Pid.Equal(op.Pid) {

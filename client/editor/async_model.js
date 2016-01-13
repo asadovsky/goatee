@@ -34,26 +34,15 @@ Model.prototype.getSelectionRange = function() {
   return [this.selStart_, this.selEnd_];
 };
 
-Model.prototype.insertText = function(pos, value) {
+Model.prototype.replaceText = function(pos, len, value) {
   if (this.paused_) {
     throw new Error('paused');
   }
-  if (value.length === 0) {
+  if (len === 0 && value.length === 0) {
     return;
   }
   this.paused_ = true;
-  this.handler_.handleInsert(pos, value);
-};
-
-Model.prototype.deleteText = function(pos, len) {
-  if (this.paused_) {
-    throw new Error('paused');
-  }
-  if (len === 0) {
-    return;
-  }
-  this.paused_ = true;
-  this.handler_.handleDelete(pos, len);
+  this.handler_.handleReplaceText(pos, len, value);
 };
 
 Model.prototype.setSelectionRange = function(start, end) {
@@ -70,50 +59,26 @@ Model.prototype.setSelectionRange = function(start, end) {
   this.emit('setSelectionRange', new ev.SetSelectionRange(true, start, end));
 };
 
-Model.prototype.applyInsert = function(isLocal, pos, value) {
+Model.prototype.applyReplaceText = function(isLocal, pos, len, value) {
   if (isLocal) {
     this.paused_ = false;
   }
   var t = this.text_;
-  if (pos < 0 || pos > t.length) {
-    throw new Error('insert out of bounds');
+  if (pos < 0 || pos + len > t.length) {
+    throw new Error('out of bounds');
   }
-  this.text_ = t.substr(0, pos) + value + t.substr(pos);
+  this.text_ = t.substr(0, pos) + value + t.substr(pos + len);
   // Update selection range.
   if (isLocal) {
     this.selStart_ = pos + value.length;
     this.selEnd_ = this.selStart_;
   } else {
     if (this.selStart_ >= pos) {
-      this.selStart_ += value.length;
+      this.selStart_ = Math.max(pos, this.selStart_ - len) + value.length;
     }
     if (this.selEnd_ >= pos) {
-      this.selEnd_ += value.length;
+      this.selEnd_ = Math.max(pos, this.selEnd_ - len) + value.length;
     }
   }
-  this.emit('insertText', new ev.InsertText(isLocal, pos, value));
-};
-
-Model.prototype.applyDelete = function(isLocal, pos, len) {
-  if (isLocal) {
-    this.paused_ = false;
-  }
-  var t = this.text_;
-  if (pos < 0 || pos + len > t.length) {
-    throw new Error('delete out of bounds');
-  }
-  this.text_ = t.substr(0, pos) + t.substr(pos + len);
-  // Update selection range.
-  if (isLocal) {
-    this.selStart_ = pos;
-    this.selEnd_ = this.selStart_;
-  } else {
-    if (this.selStart_ > pos) {
-      this.selStart_ = Math.max(pos, this.selStart_ - len);
-    }
-    if (this.selEnd_ > pos) {
-      this.selEnd_ = Math.max(pos, this.selEnd_ - len);
-    }
-  }
-  this.emit('deleteText', new ev.DeleteText(isLocal, pos, len));
+  this.emit('replaceText', new ev.ReplaceText(isLocal, pos, len, value));
 };

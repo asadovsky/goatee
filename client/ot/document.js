@@ -72,14 +72,16 @@ Document.prototype.getModel = function() {
 ////////////////////////////////////////
 // Model event handlers
 
-Document.prototype.handleInsert = function(pos, value) {
-  this.m_.applyInsert(true, pos, value);
-  this.pushOp_(new text.Insert(pos, value));
-};
-
-Document.prototype.handleDelete = function(pos, len) {
-  this.m_.applyDelete(true, pos, len);
-  this.pushOp_(new text.Delete(pos, len));
+Document.prototype.handleReplaceText = function(pos, len, value) {
+  this.m_.applyReplaceText(true, pos, len, value);
+  var ops = [];
+  if (len) {
+    ops.push(new text.Delete(pos, len));
+  }
+  if (value.length) {
+    ops.push(new text.Insert(pos, value));
+  }
+  this.pushOps_(ops);
 };
 
 ////////////////////////////////////////
@@ -109,7 +111,7 @@ Document.prototype.processChangeMsg_ = function(msg) {
     this.clientOps_.slice(this.ackedClientOpIdx_ + 1), ops);
   var bufferedOps = tup[0];
   ops = tup[1];
-  // Unfortunately, splice doesn't support Array inputs.
+  // Splice bufferedOps into this.clientOps_.
   var i;
   for (i = 0; i < bufferedOps.length; i++) {
     this.clientOps_[this.ackedClientOpIdx_ + 1 + i] = bufferedOps[i];
@@ -119,10 +121,10 @@ Document.prototype.processChangeMsg_ = function(msg) {
     var op = ops[i];
     switch (op.constructor.name) {
     case 'Insert':
-      this.m_.applyInsert(false, op.pos, op.value);
+      this.m_.applyReplaceText(false, op.pos, 0, op.value);
       break;
     case 'Delete':
-      this.m_.applyDelete(false, op.pos, op.len);
+      this.m_.applyReplaceText(false, op.pos, op.len, '');
       break;
     default:
       throw new Error(op.constructor.name);
@@ -148,16 +150,14 @@ Document.prototype.sendBufferedOps_ = function() {
   });
 };
 
-Document.prototype.pushOp_ = function(op) {
-  // Schedule op to be sent to server.
+Document.prototype.pushOps_ = function(ops) {
+  // Schedule ops to be sent to server.
   var clientOpIdx = this.clientOps_.length;
-  this.clientOps_.push(op);
-  // If op is parented off server state (as opposed to some not-yet-acked client
-  // state), send it right away.
+  Array.prototype.push.apply(this.clientOps_, ops);
+  // If ops are parented off server state (as opposed to some not-yet-acked
+  // client state), send them right away.
   if (clientOpIdx === this.ackedClientOpIdx_ + 1) {
-    // Use setTimeout(x, 0) to avoid blocking the client.
-    // TODO: Make it so that combination ops (e.g. delete selection + insert
-    // replacement text) are sent to the server together.
+    // Use setTimeout to avoid blocking the client.
     window.setTimeout(this.sendBufferedOps_.bind(this), 0);
   }
 };

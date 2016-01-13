@@ -133,17 +133,21 @@ function decodeLogoot(s) {
   return new Logoot(JSON.parse(s));
 }
 
+Logoot.prototype.len = function() {
+  return this.atoms_.length;
+};
+
 Logoot.prototype.pid = function(i) {
   return this.atoms_[i].Pid;
 };
 
-Logoot.prototype.applyInsert = function(op) {
+Logoot.prototype.applyInsertText = function(op) {
   var p = this.search_(op.pid);
   this.atoms_.splice(p, 0, {Pid: op.pid, Value: op.value});
   return p;
 };
 
-Logoot.prototype.applyDelete = function(op) {
+Logoot.prototype.applyDeleteText = function(op) {
   var p = this.search_(op.pid);
   this.atoms_.splice(p, 1);
   return p;

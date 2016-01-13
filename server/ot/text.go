@@ -33,7 +33,7 @@ func (op *Insert) Encode() string {
 
 func (op *Insert) Apply(s string) (string, error) {
 	if op.Pos < 0 || op.Pos > len(s) {
-		return "", errors.New("insert out of bounds")
+		return "", errors.New("out of bounds")
 	}
 	return s[:op.Pos] + op.Value + s[op.Pos:], nil
 }
@@ -50,7 +50,7 @@ func (op *Delete) Encode() string {
 
 func (op *Delete) Apply(s string) (string, error) {
 	if op.Pos < 0 || op.Pos+op.Len > len(s) {
-		return "", errors.New("delete out of bounds")
+		return "", errors.New("out of bounds")
 	}
 	return s[:op.Pos] + s[op.Pos+op.Len:], nil
 }

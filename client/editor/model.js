@@ -27,10 +27,14 @@ Model.prototype.getSelectionRange = function() {
 };
 
 Model.prototype.insertText = function(pos, value) {
-  throw new Error('not implemented');
+  return this.replaceText(pos, 0, value);
 };
 
 Model.prototype.deleteText = function(pos, len) {
+  return this.replaceText(pos, len, '');
+};
+
+Model.prototype.replaceText = function(pos, len, value) {
   throw new Error('not implemented');
 };
 
