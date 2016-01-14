@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/asadovsky/gosh"
+	// FIXME: Switch to gorilla websocket.
+	// https://redd.it/2n1vlp
 	"golang.org/x/net/websocket"
 
 	"github.com/asadovsky/goatee/server/common"
@@ -17,9 +19,9 @@ import (
 	"github.com/asadovsky/goatee/server/ot"
 )
 
-func ok(err error) {
+func ok(err error, v ...interface{}) {
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("%v: %s", err, fmt.Sprint(v...)))
 	}
 }
 
@@ -138,7 +140,7 @@ func (h *hub) handleConn(ws *websocket.Conn) {
 				ok(err)
 			}
 			var mt common.MsgType
-			ok(json.Unmarshal(buf, &mt))
+			ok(json.Unmarshal(buf, &mt), string(buf))
 			switch mt.Type {
 			case "Init":
 				var msg common.Init

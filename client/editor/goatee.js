@@ -1,15 +1,10 @@
 // Implementation of Editor interface.
 //
 // TODO:
-// - For faster text mutations, represent text using something like
-//   https://github.com/josephg/jumprope
-// - Make select-scroll smoother
-// - Support bold, italics
-// - Support font-size and line-height
+// - Support user-specified font sizes and styles (e.g. bold)
 // - Support non-ASCII characters
-// - Fancier cut/copy/paste, see http://stackoverflow.com/q/9658282/316226
-// - Support screen scaling
-// - Consider using React
+// - Fancier clipboard; see http://stackoverflow.com/q/9658282/316226
+// - Explore using React
 //
 // OT-specific TODO:
 // - Show other users' cursors/selections

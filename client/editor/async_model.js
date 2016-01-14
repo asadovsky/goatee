@@ -16,7 +16,7 @@ function Model(handler, initialText) {
   ModelInterface.call(this);
   this.paused_ = false;
   this.handler_ = handler;
-  // Note, we assume line breaks have been canonicalized to \n.
+  // TODO: Use a rope data structure, e.g. the jumprope npm package.
   this.text_ = initialText || '';
   this.selStart_ = 0;
   this.selEnd_ = 0;
@@ -62,6 +62,9 @@ Model.prototype.setSelectionRange = function(start, end) {
 Model.prototype.applyReplaceText = function(isLocal, pos, len, value) {
   if (isLocal) {
     this.paused_ = false;
+  }
+  if (len === 0 && value.length === 0) {
+    return;
   }
   var t = this.text_;
   if (pos < 0 || pos + len > t.length) {

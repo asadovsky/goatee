@@ -34,6 +34,7 @@ Model.prototype.deleteText = function(pos, len) {
   return this.replaceText(pos, len, '');
 };
 
+// Note, we assume line breaks have been canonicalized to \n.
 Model.prototype.replaceText = function(pos, len, value) {
   throw new Error('not implemented');
 };

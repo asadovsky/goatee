@@ -281,7 +281,7 @@ func (l *Logoot) ApplyUpdate(u *common.Update, c *common.Change) error {
 				return errors.New("cannot have multiple ClientInsert ops")
 			}
 			gotClientInsert = true
-			// TODO: Smarter PID allocation.
+			// TODO: Smarter pid allocation.
 			prevPid := v.PrevPid
 			for j := 0; j < len(v.Value); j++ {
 				x := &Insert{genPid(u.ClientId, prevPid, v.NextPid), string(v.Value[j])}
@@ -314,10 +314,11 @@ func (l *Logoot) Encode() (string, error) {
 	return string(buf), nil
 }
 
-func randPosBetween(prev, next uint32) uint32 {
+func randUint32Between(prev, next uint32) uint32 {
 	return prev + 1 + uint32(rand.Int63n(int64(next-prev-1)))
 }
 
+// TODO: Smarter pid allocation, e.g. LSEQ.
 func genIds(agentId int, prev, next []Id) []Id {
 	if len(prev) == 0 {
 		prev = []Id{{Pos: 0, AgentId: agentId}}
@@ -326,7 +327,7 @@ func genIds(agentId int, prev, next []Id) []Id {
 		next = []Id{{Pos: math.MaxUint32, AgentId: agentId}}
 	}
 	if prev[0].Pos+1 < next[0].Pos {
-		pos := randPosBetween(prev[0].Pos, next[0].Pos)
+		pos := randUint32Between(prev[0].Pos, next[0].Pos)
 		return []Id{{Pos: pos, AgentId: agentId}}
 	}
 	return append([]Id{prev[0]}, genIds(agentId, prev[1:], next[1:])...)

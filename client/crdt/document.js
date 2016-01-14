@@ -78,32 +78,65 @@ Document.prototype.processSnapshotMsg_ = function(msg) {
 };
 
 Document.prototype.processChangeMsg_ = function(msg) {
+  var that = this;
   var isLocal = msg.ClientId === this.clientId_;
 
   // Apply all mutations, regardless of whether they originated from this client
   // (i.e. unidirectional data flow).
   var ops = logoot.decodeOps(msg.OpStrs);
+
+  // Consecutive single-char insertions and deletions are common, and applying
+  // lots of point mutations to the model is expensive (e.g. applying 400 point
+  // deletions takes hundreds of milliseconds), so we compact such ops when
+  // updating the model.
+  var pos = -1, len = 0, value = '';
+  function applyReplaceText() {
+    if (pos !== -1) {
+      that.m_.applyReplaceText(isLocal, pos, len, value);
+    }
+  }
+
   for (var i = 0; i < ops.length; i++) {
     var op = ops[i];
-    var pos;
     switch(op.constructor.name) {
     case 'Insert':
-      pos = this.logoot_.applyInsertText(op);
-      this.m_.applyReplaceText(isLocal, pos, 0, op.value);
+      var insertPos = this.logoot_.applyInsertText(op);
+      if (insertPos === pos + value.length) {
+        value += op.value;
+      } else {
+        applyReplaceText();
+        pos = insertPos;
+        len = 0;
+        value = op.value;
+      }
       break;
     case 'Delete':
-      pos = this.logoot_.applyDeleteText(op);
-      this.m_.applyReplaceText(isLocal, pos, 1, '');
+      var deletePos = this.logoot_.applyDeleteText(op);
+      if (deletePos === pos) {
+        len++;
+      } else {
+        applyReplaceText();
+        pos = deletePos;
+        len = 1;
+        value = '';
+      }
       break;
     default:
       throw new Error(op.constructor.name);
     }
   }
+  applyReplaceText();
 };
 
 ////////////////////////////////////////
 // Other private helpers
 
+// TODO: Deleting a 500+ character string causes the server to crash with a JSON
+// parsing error, presumably due to some limit on the size of a single websocket
+// message. Perhaps we should do chunking.
+// FIXME: Actually, turns out that's due to a bug in golang.org/x/net/websocket;
+// we should use github.com/gorilla/websocket instead.
+// FIXME: Delta encoding; more efficient pid encoding; compression.
 Document.prototype.sendOps_ = function(ops) {
   if (!ops.length) {
     return;

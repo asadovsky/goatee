@@ -12,6 +12,7 @@ module.exports = Model;
 
 function Model(initialText) {
   ModelInterface.call(this);
+  // TODO: Use a rope data structure, e.g. the jumprope npm package.
   this.text_ = initialText || '';
   this.selStart_ = 0;
   this.selEnd_ = 0;
