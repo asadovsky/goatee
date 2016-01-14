@@ -236,12 +236,10 @@ Editor.prototype.initCharSizes_ = function() {
 };
 
 Editor.prototype.rowFromY_ = function(y) {
-  var row;
-  // TODO: Use binary search.
-  for (row = 0; row < this.lineYOffsets_.length - 1; row++) {
-    if (y <= this.lineYOffsets_[row][1]) break;
-  }
-  return row;
+  var that = this;
+  return util.search(this.lineYOffsets_.length - 1, function(i) {
+    return y <= that.lineYOffsets_[i][1];
+  });
 };
 
 Editor.prototype.cursorHop_ = function(p, forward, hop) {
@@ -396,14 +394,12 @@ Editor.prototype.replaceSelection_ = function(value) {
 // Pure render methods
 
 Editor.prototype.computeCursorRowAndLeft_ = function() {
-  var numRows = this.linePOffsets_.length;
-  var selEnd = this.m_.getSelectionRange()[1];
-  var p, row = 0;
-  // TODO: Binary search.
-  for (; row < numRows - 1; row++) {
-    p = this.linePOffsets_[row][1];
-    if (selEnd < p || (selEnd === p && this.cursor_.rightEnd)) break;
-  }
+  var that = this;
+  var p, selEnd = this.m_.getSelectionRange()[1];
+  var row = util.search(this.linePOffsets_.length - 1, function(i) {
+    p = that.linePOffsets_[i][1];
+    return selEnd < p || (selEnd === p && that.cursor_.rightEnd);
+  });
   var left = 0;
   for (p = this.linePOffsets_[row][0]; p < selEnd; p++) {
     left += this.charSizes_[p][0];

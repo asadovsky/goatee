@@ -154,11 +154,10 @@ Logoot.prototype.applyDeleteText = function(op) {
 };
 
 Logoot.prototype.search_ = function(pid) {
-  // TODO: Binary search.
-  for (var i = 0; i < this.atoms_.length; i++) {
-    if (!pidLess(this.atoms_[i].Pid, pid)) return i;
-  }
-  return this.atoms_.length;
+  var that = this;
+  return util.search(this.atoms_.length, function(i) {
+    return !pidLess(that.atoms_[i].Pid, pid);
+  });
 };
 
 module.exports = {
