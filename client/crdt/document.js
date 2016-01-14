@@ -131,12 +131,7 @@ Document.prototype.processChangeMsg_ = function(msg) {
 ////////////////////////////////////////
 // Other private helpers
 
-// TODO: Deleting a 500+ character string causes the server to crash with a JSON
-// parsing error, presumably due to some limit on the size of a single websocket
-// message. Perhaps we should do chunking.
-// FIXME: Actually, turns out that's due to a bug in golang.org/x/net/websocket;
-// we should use github.com/gorilla/websocket instead.
-// FIXME: Delta encoding; more efficient pid encoding; compression.
+// TODO: Delta encoding; more efficient pid encoding; compression.
 Document.prototype.sendOps_ = function(ops) {
   if (!ops.length) {
     return;

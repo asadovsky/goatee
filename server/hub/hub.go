@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/asadovsky/gosh"
-	// FIXME: Switch to gorilla websocket.
-	// https://redd.it/2n1vlp
-	"golang.org/x/net/websocket"
+	"github.com/gorilla/websocket"
 
 	"github.com/asadovsky/goatee/server/common"
 	"github.com/asadovsky/goatee/server/crdt"
@@ -31,17 +29,17 @@ func assert(b bool, v ...interface{}) {
 	}
 }
 
-func jsonMarshal(v interface{}) string {
+func jsonMarshal(v interface{}) []byte {
 	buf, err := json.Marshal(v)
 	ok(err)
-	return string(buf)
+	return buf
 }
 
 type hub struct {
-	clients      map[chan<- string]bool // set of active clients
-	subscribe    chan chan<- string
-	unsubscribe  chan chan<- string
-	broadcast    chan string
+	clients      map[chan<- []byte]bool // set of active clients
+	subscribe    chan chan<- []byte
+	unsubscribe  chan chan<- []byte
+	broadcast    chan []byte
 	mu           sync.Mutex // protects the fields below
 	nextClientId int
 	text         *ot.Text
@@ -50,10 +48,10 @@ type hub struct {
 
 func newHub() *hub {
 	return &hub{
-		clients:     make(map[chan<- string]bool),
-		subscribe:   make(chan chan<- string),
-		unsubscribe: make(chan chan<- string),
-		broadcast:   make(chan string),
+		clients:     make(map[chan<- []byte]bool),
+		subscribe:   make(chan chan<- []byte),
+		unsubscribe: make(chan chan<- []byte),
+		broadcast:   make(chan []byte),
 		text:        ot.NewText(""),
 		logoot:      crdt.NewLogoot(),
 	}
@@ -76,8 +74,8 @@ func (h *hub) run() {
 
 type stream struct {
 	h           *hub
-	ws          *websocket.Conn
-	send        chan string
+	conn        *websocket.Conn
+	send        chan []byte
 	initialized bool
 	isLogoot    bool
 }
@@ -101,7 +99,7 @@ func (s *stream) processInitMsg(msg *common.Init) {
 	} else {
 		s.h.text.PopulateSnapshot(sn)
 	}
-	ok(websocket.Message.Send(s.ws, jsonMarshal(sn)))
+	ok(s.conn.WriteJSON(sn))
 	s.h.nextClientId++
 	s.h.subscribe <- s.send
 	s.h.mu.Unlock()
@@ -125,22 +123,24 @@ func (s *stream) processUpdateMsg(msg *common.Update) {
 	s.h.broadcast <- jsonMarshal(ch)
 }
 
-func (h *hub) handleConn(ws *websocket.Conn) {
-	s := &stream{h: h, ws: ws, send: make(chan string)}
+func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
+	const bufSize = 1024
+	conn, err := websocket.Upgrade(w, r, nil, bufSize, bufSize)
+	ok(err)
+	s := &stream{h: h, conn: conn, send: make(chan []byte)}
 	eof, done := make(chan bool), make(chan bool)
 
 	go func() {
 		for {
-			var buf []byte
-			if err := websocket.Message.Receive(ws, &buf); err != nil {
-				if err == io.EOF {
-					eof <- true
-					return
-				}
-				ok(err)
+			_, buf, err := conn.ReadMessage()
+			if err == io.EOF {
+				eof <- true
+				return
 			}
+			ok(err)
+			// TODO: Avoid decoding multiple times.
 			var mt common.MsgType
-			ok(json.Unmarshal(buf, &mt), string(buf))
+			ok(json.Unmarshal(buf, &mt))
 			switch mt.Type {
 			case "Init":
 				var msg common.Init
@@ -160,7 +160,7 @@ func (h *hub) handleConn(ws *websocket.Conn) {
 		for {
 			select {
 			case msg := <-s.send:
-				ok(websocket.Message.Send(ws, msg))
+				ok(conn.WriteMessage(websocket.TextMessage, msg))
 			case <-eof:
 				done <- true
 				return
@@ -180,13 +180,13 @@ func (h *hub) handleConn(ws *websocket.Conn) {
 	close(s.send)
 	close(eof)
 	close(done)
-	ws.Close()
+	conn.Close()
 }
 
 func Serve(addr string) error {
 	h := newHub()
 	go h.run()
-	http.Handle("/", websocket.Handler(h.handleConn))
+	http.HandleFunc("/", h.handleConn)
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		gosh.SendReady()
