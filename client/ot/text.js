@@ -1,4 +1,4 @@
-// Mirrors server/ot/text.go.
+// Mostly mirrors server/ot/text.go.
 // TODO: Shared, data-driven unit tests.
 
 'use strict';

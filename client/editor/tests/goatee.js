@@ -2,10 +2,10 @@
 //
 // TODO:
 // - Mouse tests
-// - Verify that everything still works with 20px border
-// - Add tests where we apply the same operations in textarea and editor, then
-//   compare state
-// - Add tests for rendering, perhaps using
+// - Verify that everything still works when the host element has a border
+// - Add tests to verify that GoateeEditor and TextareaEditor handle operations
+//   identically
+// - Add tests for rendering, perhaps using:
 //   - Depicted (https://github.com/bslatkin/dpxdt)
 //   - Huxley (https://github.com/facebook/huxley)
 

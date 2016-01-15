@@ -6,7 +6,7 @@
 // - Fancier clipboard; see http://stackoverflow.com/q/9658282/316226
 // - Explore using React
 //
-// OT-specific TODO:
+// Collaboration-specific TODO:
 // - Show other users' cursors/selections
 // - Retain cursor_.prevLeft when applying non-local text mutations
 

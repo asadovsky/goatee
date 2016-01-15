@@ -1,5 +1,4 @@
-// Mirrors server/crdt/logoot.go.
-// Unlike logoot.go, here we only deal in encoded pids.
+// Mostly mirrors server/crdt/logoot.go.
 // TODO: Shared, data-driven unit tests.
 
 'use strict';

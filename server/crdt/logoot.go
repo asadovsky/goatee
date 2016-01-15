@@ -149,7 +149,10 @@ func (op *Insert) Encode() string {
 }
 
 // Delete represents an atom deletion. Pid is the position identifier of the
-// deleted atom.
+// deleted atom. Note, Delete cannot be defined as a [start, end] range because
+// it must commute with Insert.
+// TODO: To reduce client->server message size, maybe add a ClientDelete
+// operation defined as a [start, end] range.
 type Delete struct {
 	Pid *Pid
 }
