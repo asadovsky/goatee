@@ -3,7 +3,6 @@ package hub
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"sync"
@@ -133,7 +132,7 @@ func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		for {
 			_, buf, err := conn.ReadMessage()
-			if err == io.EOF {
+			if ce, ok := err.(*websocket.CloseError); ok && (ce.Code == websocket.CloseNormalClosure || ce.Code == websocket.CloseGoingAway) {
 				eof <- true
 				return
 			}

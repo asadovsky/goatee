@@ -321,7 +321,9 @@ func randUint32Between(prev, next uint32) uint32 {
 	return prev + 1 + uint32(rand.Int63n(int64(next-prev-1)))
 }
 
-// TODO: Smarter pid allocation, e.g. LSEQ.
+// TODO: Smarter pid allocation, e.g. LSEQ. Also, maybe do something to ensure
+// that concurrent multi-atom insertions from different agents do not get
+// interleaved.
 func genIds(agentId int, prev, next []Id) []Id {
 	if len(prev) == 0 {
 		prev = []Id{{Pos: 0, AgentId: agentId}}
@@ -330,8 +332,7 @@ func genIds(agentId int, prev, next []Id) []Id {
 		next = []Id{{Pos: math.MaxUint32, AgentId: agentId}}
 	}
 	if prev[0].Pos+1 < next[0].Pos {
-		pos := randUint32Between(prev[0].Pos, next[0].Pos)
-		return []Id{{Pos: pos, AgentId: agentId}}
+		return []Id{{Pos: randUint32Between(prev[0].Pos, next[0].Pos), AgentId: agentId}}
 	}
 	return append([]Id{prev[0]}, genIds(agentId, prev[1:], next[1:])...)
 }
