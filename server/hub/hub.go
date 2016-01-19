@@ -127,13 +127,13 @@ func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Upgrade(w, r, nil, bufSize, bufSize)
 	ok(err)
 	s := &stream{h: h, conn: conn, send: make(chan []byte)}
-	eof, done := make(chan bool), make(chan bool)
+	eof, done := make(chan struct{}), make(chan struct{})
 
 	go func() {
 		for {
 			_, buf, err := conn.ReadMessage()
 			if ce, ok := err.(*websocket.CloseError); ok && (ce.Code == websocket.CloseNormalClosure || ce.Code == websocket.CloseGoingAway) {
-				eof <- true
+				close(eof)
 				return
 			}
 			ok(err)
@@ -161,7 +161,7 @@ func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
 			case msg := <-s.send:
 				ok(conn.WriteMessage(websocket.TextMessage, msg))
 			case <-eof:
-				done <- true
+				close(done)
 				return
 			}
 		}
@@ -177,8 +177,6 @@ func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
 	}
 	h.mu.Unlock()
 	close(s.send)
-	close(eof)
-	close(done)
 	conn.Close()
 }
 
