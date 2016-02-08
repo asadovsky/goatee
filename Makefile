@@ -16,12 +16,12 @@ endef
 
 all: build
 
-.PHONY: build
-
 node_modules: package.json
 	npm prune
 	npm install
 	touch $@
+
+.PHONY: build
 
 build: dist/editor.min.js
 dist/editor.min.js: client/editor/index.js $(shell find client) node_modules
