@@ -56,9 +56,9 @@ func main() {
 	addr := fmt.Sprintf("%s:%d", hostname, *port)
 	httpAddr := fmt.Sprintf("%s:8080", hostname)
 	c := sh.FuncCmd(serve, addr)
-	c.AddStderrWriter(gosh.NopWriteCloser(os.Stderr))
+	c.AddStderrWriter(os.Stderr)
 	c.Start()
-	c.AwaitReady()
+	c.AwaitVars("ready")
 	// Note, the "open" command doesn't support query strings in file urls.
 	fmt.Printf("http://%s/demo/index.html?mode=%s&addr=%s\n", httpAddr, *mode, url.QueryEscape(addr))
 	ok(http.ListenAndServe(httpAddr, http.FileServer(http.Dir(filepath.Join(cwd)))))

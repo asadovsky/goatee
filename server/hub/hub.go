@@ -186,7 +186,7 @@ func Serve(addr string) error {
 	http.HandleFunc("/", h.handleConn)
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		gosh.SendReady()
+		gosh.SendVars(map[string]string{"ready": ""})
 	}()
 	return http.ListenAndServe(addr, nil)
 }
