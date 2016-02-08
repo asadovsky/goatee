@@ -3,12 +3,11 @@
 ### p0
 
 - Implement basic types, e.g. LWW-Register, PN-Counter, OR-Set, 2P2P-Graph
-- Implement string type, e.g. Logoot, Treedoc, or LSEQ
+- Implement Logoot-based list type
 
 ### p1
 
 - Discovery setup
-- Implement generic list type
 
 # OT
 
