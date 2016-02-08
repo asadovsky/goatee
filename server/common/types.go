@@ -1,6 +1,6 @@
 package common
 
-// For detecting message type.
+// For detecting incoming message type.
 type MsgType struct {
 	Type string
 }
