@@ -59,6 +59,8 @@ Model.prototype.setSelectionRange = function(start, end) {
   this.emit('setSelectionRange', new ev.SetSelectionRange(true, start, end));
 };
 
+// FIXME: A single Model.replaceText can result in multiple calls to
+// Model.applyReplaceText; we shouldn't unpause until all calls have occurred.
 Model.prototype.applyReplaceText = function(isLocal, pos, len, value) {
   if (isLocal) {
     this.paused_ = false;
