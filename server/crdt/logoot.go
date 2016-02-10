@@ -52,6 +52,7 @@ type Id struct {
 }
 
 // Pid is a Logoot position identifier.
+// TODO: Add logical clock value.
 type Pid struct {
 	Ids []Id
 }
