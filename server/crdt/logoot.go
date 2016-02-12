@@ -101,7 +101,7 @@ func DecodePid(s string) (*Pid, error) {
 	for i, v := range idStrs {
 		parts := strings.Split(v, ".")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid pid: %s", v)
+			return nil, fmt.Errorf("invalid id: %s", v)
 		}
 		pos, err := strconv.ParseUint(parts[0], 10, 32)
 		if err != nil {
@@ -246,9 +246,8 @@ type Atom struct {
 
 // Logoot represents a string that supports Logoot operations.
 type Logoot struct {
-	atoms       []Atom
-	value       string
-	lastPatchId int
+	atoms []Atom
+	value string
 }
 
 func NewLogoot() *Logoot {
@@ -282,7 +281,7 @@ func (l *Logoot) ApplyUpdate(u *common.Update, c *common.Change) error {
 		switch v := op.(type) {
 		case *ClientInsert:
 			if gotClientInsert {
-				return errors.New("cannot have multiple ClientInsert ops")
+				return errors.New("cannot apply multiple ClientInsert ops")
 			}
 			gotClientInsert = true
 			// TODO: Smarter pid allocation.
