@@ -47,6 +47,7 @@ Op.prototype.encode = function() {
 
 inherits(ClientInsert, Op);
 function ClientInsert(prevPid, nextPid, value) {
+  Op.call(this);
   this.prevPid = prevPid;
   this.nextPid = nextPid;
   this.value = value;
@@ -60,6 +61,7 @@ ClientInsert.prototype.encode = function() {
 
 inherits(Insert, Op);
 function Insert(pid, value) {
+  Op.call(this);
   this.pid = pid;
   this.value = value;
 }
@@ -70,6 +72,7 @@ Insert.prototype.encode = function() {
 
 inherits(Delete, Op);
 function Delete(pid) {
+  Op.call(this);
   this.pid = pid;
 }
 
