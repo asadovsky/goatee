@@ -13,7 +13,7 @@
   "nonbsp": true,
   "nonew": true,
   "quotmark": "single",
-  "strict": true,
+  "strict": "implied",
   "sub": true,
   "trailing": true,
   "undef": true,
@@ -24,6 +24,5 @@
   "node": true,
 
   "globals": {
-    "goatee": false
   }
 }

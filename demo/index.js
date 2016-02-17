@@ -1,15 +1,12 @@
-'use strict';
-
 /* jshint newcap: false */
 
 var _ = require('lodash');
 var eddie = require('eddie');
-var React = require('react');
+var React = require('react'), h = require('react-h-function')(React);
 var ReactDOM = require('react-dom');
 var url = require('url');
 
 var crdt = require('../client/crdt');
-var h = require('./util').h;
 var ot = require('../client/ot');
 
 function newEditor(el, type, model) {

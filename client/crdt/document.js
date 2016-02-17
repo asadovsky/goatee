@@ -1,7 +1,5 @@
 // Document class.
 
-'use strict';
-
 var eddie = require('eddie');
 
 var logoot = require('./logoot');

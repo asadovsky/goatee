@@ -1,8 +1,6 @@
 // Mostly mirrors server/crdt/logoot.go.
 // TODO: Shared, data-driven unit tests.
 
-'use strict';
-
 var _ = require('lodash');
 var inherits = require('inherits');
 

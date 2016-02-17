@@ -1,7 +1,5 @@
 // Client-side Logoot CRDT.
 
-'use strict';
-
 /* global Document: true */
 var Document = require('./document');
 

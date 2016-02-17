@@ -7,8 +7,6 @@
 // - Maybe add canUndo/canRedo properties
 // - Check for race conditions
 
-'use strict';
-
 var eddie = require('eddie');
 
 var text = require('./text');

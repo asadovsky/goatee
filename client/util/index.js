@@ -1,4 +1,4 @@
-'use strict';
+// Utility functions.
 
 exports.isAlphaNum = function(s) {
   return (/[A-Za-z0-9]/g).test(s);
