@@ -46,7 +46,6 @@ var Editor = React.createFactory(React.createClass({
   }
 }));
 
-// TODO: Add toggle buttons for mode and type.
 var Page = React.createFactory(React.createClass({
   displayName: 'Page',
   render: function() {
