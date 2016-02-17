@@ -2,7 +2,8 @@
 
 'use strict';
 
-var AsyncModel = require('../editor').AsyncModel;
+var eddie = require('eddie');
+
 var logoot = require('./logoot');
 var util = require('../util');
 
@@ -74,7 +75,7 @@ Document.prototype.processSnapshotMsg_ = function(msg) {
   console.assert(this.clientId_ === null);
   this.clientId_ = msg.ClientId;
   this.logoot_ = logoot.decodeLogoot(msg.LogootStr);
-  this.m_ = new AsyncModel(this, msg.Text);
+  this.m_ = new eddie.AsyncModel(this, msg.Text);
 };
 
 Document.prototype.processChangeMsg_ = function(msg) {

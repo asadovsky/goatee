@@ -9,7 +9,8 @@
 
 'use strict';
 
-var AsyncModel = require('../editor').AsyncModel;
+var eddie = require('eddie');
+
 var text = require('./text');
 var util = require('../util');
 
@@ -91,7 +92,7 @@ Document.prototype.processSnapshotMsg_ = function(msg) {
   console.assert(this.clientId_ === null);
   this.clientId_ = msg.ClientId;
   this.basePatchId_ = Number(msg.BasePatchId);
-  this.m_ = new AsyncModel(this, msg.Text);
+  this.m_ = new eddie.AsyncModel(this, msg.Text);
 };
 
 Document.prototype.processChangeMsg_ = function(msg) {

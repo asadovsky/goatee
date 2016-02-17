@@ -3,18 +3,21 @@
 /* jshint newcap: false */
 
 var _ = require('lodash');
+var eddie = require('eddie');
 var React = require('react');
 var ReactDOM = require('react-dom');
 var url = require('url');
 
+var crdt = require('../client/crdt');
 var h = require('./util').h;
+var ot = require('../client/ot');
 
 function newEditor(el, type, model) {
-  if (type === 'goatee') {
-    return new goatee.editor.GoateeEditor(el, model);
+  if (type === 'eddie') {
+    return new eddie.EddieEditor(el, model);
   } else {
     console.assert(type === 'textarea');
-    return new goatee.editor.TextareaEditor(el, model);
+    return new eddie.TextareaEditor(el, model);
   }
 }
 
@@ -32,10 +35,10 @@ var Editor = React.createFactory(React.createClass({
       onLoad(null);
       break;
     case 'ot':
-      goatee.ot.load(this.props.addr, 0, onLoad);
+      ot.load(this.props.addr, 0, onLoad);
       break;
     case 'crdt':
-      goatee.crdt.load(this.props.addr, 0, onLoad);
+      crdt.load(this.props.addr, 0, onLoad);
       break;
     default:
       throw new Error(this.props.mode);
@@ -66,6 +69,6 @@ var u = url.parse(window.location.href, true);
 
 ReactDOM.render(Page({
   mode: u.query.mode || 'local',
-  type: u.query.type || 'goatee',
+  type: u.query.type || 'eddie',
   addr: u.query.addr || 'localhost:4000'
 }), document.getElementById('page'));

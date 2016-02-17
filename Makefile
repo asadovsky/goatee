@@ -7,11 +7,6 @@ define BROWSERIFY
 	browserify $1 -d -t [ envify purge ] -o $2
 endef
 
-define BROWSERIFY_STANDALONE
-	@mkdir -p $(dir $2)
-	browserify $1 -s goatee.$3 -d -t [ envify purge ] -o $2
-endef
-
 .DELETE_ON_ERROR:
 
 all: build
@@ -22,18 +17,6 @@ node_modules: package.json
 	touch $@
 
 .PHONY: build
-
-build: dist/editor.min.js
-dist/editor.min.js: client/editor/index.js $(shell find client) node_modules
-	$(call BROWSERIFY_STANDALONE,$<,$@,editor)
-
-build: dist/ot.min.js
-dist/ot.min.js: client/ot/index.js $(shell find client) node_modules
-	$(call BROWSERIFY_STANDALONE,$<,$@,ot)
-
-build: dist/crdt.min.js
-dist/crdt.min.js: client/crdt/index.js $(shell find client) node_modules
-	$(call BROWSERIFY_STANDALONE,$<,$@,crdt)
 
 build: dist/demo.min.js
 dist/demo.min.js: demo/index.js node_modules
@@ -65,21 +48,9 @@ demo-crdt: build
 ########################################
 # Test, clean, and lint
 
-dist/client/editor/tests/goatee.min.js: client/editor/tests/goatee.js $(shell find client) node_modules
-	$(call BROWSERIFY,$<,$@)
-
-.PHONY: test-server
-test-server:
-	go test github.com/asadovsky/goatee/server/...
-
-# TODO: Use https://github.com/hughsk/smokestack.
-.PHONY: test-editor
-test-editor: dist/client/editor/tests/goatee.min.js
-	@cp client/editor/tests/goatee.html dist/client/editor/tests
-	open file://$(shell pwd)/dist/client/editor/tests/goatee.html
-
 .PHONY: test
-test: test-server test-editor
+test:
+	go test github.com/asadovsky/goatee/...
 
 .PHONY: clean
 clean:
@@ -87,5 +58,5 @@ clean:
 
 .PHONY: lint
 lint: node_modules
-	go vet github.com/asadovsky/goatee/server/...
+	go vet github.com/asadovsky/goatee/...
 	jshint .
