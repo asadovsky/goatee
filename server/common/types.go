@@ -1,21 +1,22 @@
 package common
 
-// For detecting incoming message type.
+// For detecting incoming message type. Each struct below has Type set to the
+// struct type name.
 type MsgType struct {
 	Type string
 }
 
 // Sent from client to server.
 type Init struct {
-	Type     string // "Init"
+	Type     string
 	DocId    int
 	DataType string // "ot.Text" or "crdt.Logoot"
 }
 
 // Sent from server to client.
 type Snapshot struct {
-	Type     string // "Snapshot"
-	ClientId int    // id for this client
+	Type     string
+	ClientId int // id for this client
 
 	// Type-specific data.
 	BasePatchId int    // initial BasePatchId
@@ -25,8 +26,8 @@ type Snapshot struct {
 
 // Sent from client to server.
 type Update struct {
-	Type     string // "Update"
-	ClientId int    // client that performed this patch
+	Type     string
+	ClientId int // client that performed this patch
 
 	// Type-specific data.
 	BasePatchId int      // PatchId against which this patch was performed
@@ -35,8 +36,8 @@ type Update struct {
 
 // Sent from server to client.
 type Change struct {
-	Type     string // "Change"
-	ClientId int    // client that performed this patch
+	Type     string
+	ClientId int // client that performed this patch
 
 	// Type-specific data.
 	PatchId int
