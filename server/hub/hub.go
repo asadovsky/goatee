@@ -2,8 +2,8 @@ package hub
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -79,10 +79,11 @@ type stream struct {
 	isLogoot    bool
 }
 
-func (s *stream) processInitMsg(msg *common.Init) {
+func (s *stream) processInitMsg(msg *common.Init) error {
 	s.h.mu.Lock()
+	defer s.h.mu.Unlock()
 	if s.initialized {
-		panic("already initialized")
+		return errors.New("already initialized")
 	}
 	s.initialized = true
 	s.isLogoot = msg.DataType == "crdt.Logoot"
@@ -98,28 +99,48 @@ func (s *stream) processInitMsg(msg *common.Init) {
 	} else {
 		s.h.text.PopulateSnapshot(sn)
 	}
-	ok(s.conn.WriteJSON(sn))
+	if err := s.conn.WriteJSON(sn); err != nil {
+		return err
+	}
 	s.h.nextClientId++
+	go s.streamChanges()
 	s.h.subscribe <- s.send
-	s.h.mu.Unlock()
+	return nil
 }
 
-func (s *stream) processUpdateMsg(msg *common.Update) {
+func (s *stream) processUpdateMsg(msg *common.Update) error {
 	s.h.mu.Lock()
 	if !s.initialized {
-		panic("not initialized")
+		s.h.mu.Unlock()
+		return errors.New("not initialized")
 	}
 	ch := &common.Change{
 		Type:     "Change",
 		ClientId: msg.ClientId,
 	}
+	var err error
 	if s.isLogoot {
-		ok(s.h.logoot.ApplyUpdate(msg, ch))
+		err = s.h.logoot.ApplyUpdate(msg, ch)
 	} else {
-		ok(s.h.text.ApplyUpdate(msg, ch))
+		err = s.h.text.ApplyUpdate(msg, ch)
 	}
 	s.h.mu.Unlock()
+	if err != nil {
+		return err
+	}
 	s.h.broadcast <- jsonMarshal(ch)
+	return nil
+}
+
+// streamChanges streams changes to the client until the connection is closed.
+func (s *stream) streamChanges() {
+	for {
+		err := s.conn.WriteMessage(websocket.TextMessage, <-s.send)
+		if err == websocket.ErrCloseSent {
+			break
+		}
+		ok(err)
+	}
 }
 
 func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
@@ -127,13 +148,13 @@ func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Upgrade(w, r, nil, bufSize, bufSize)
 	ok(err)
 	s := &stream{h: h, conn: conn, send: make(chan []byte)}
-	eof, done := make(chan struct{}), make(chan struct{})
+	done := make(chan struct{})
 
 	go func() {
 		for {
 			_, buf, err := conn.ReadMessage()
-			if ce, ok := err.(*websocket.CloseError); ok && (ce.Code == websocket.CloseNormalClosure || ce.Code == websocket.CloseGoingAway) {
-				close(eof)
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				close(done)
 				return
 			}
 			ok(err)
@@ -144,33 +165,18 @@ func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
 			case "Init":
 				var msg common.Init
 				ok(json.Unmarshal(buf, &msg))
-				s.processInitMsg(&msg)
+				ok(s.processInitMsg(&msg))
 			case "Update":
 				var msg common.Update
 				ok(json.Unmarshal(buf, &msg))
-				s.processUpdateMsg(&msg)
+				ok(s.processUpdateMsg(&msg))
 			default:
 				panic(fmt.Errorf("unknown message type: %s", mt.Type))
 			}
 		}
 	}()
 
-	go func() {
-		for {
-			select {
-			case msg := <-s.send:
-				ok(conn.WriteMessage(websocket.TextMessage, msg))
-			case <-eof:
-				close(done)
-				return
-			}
-		}
-	}()
-
-	log.Printf("WAIT %v", s.send)
 	<-done
-	log.Printf("EXIT %v", s.send)
-
 	h.mu.Lock()
 	if s.initialized {
 		h.unsubscribe <- s.send
