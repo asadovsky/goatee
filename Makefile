@@ -19,7 +19,7 @@ node_modules: package.json
 .PHONY: build
 
 build: dist/demo.min.js
-dist/demo.min.js: demo/index.js node_modules
+dist/demo.min.js: demo/index.js $(shell find client) node_modules
 	$(call BROWSERIFY,$<,$@)
 
 build: dist/demo
