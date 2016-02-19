@@ -14,33 +14,28 @@ function Document(addr, docId, onLoad) {
   this.clientId_ = null;
   this.m_ = null;
 
-  // Initialize WebSocket connection.
-  var ws = new WebSocket('ws://' + addr);
+  // Initialize connection.
+  this.conn_ = new util.Conn(addr);
 
-  ws.onopen = function(e) {
-    that.ws_.sendMessage({
+  this.conn_.on('open', function() {
+    that.conn_.send({
       Type: 'Init',
       DocId: docId,
       DataType: 'crdt.Logoot'
     });
-  };
+  });
 
-  ws.onmessage = function(e) {
-    var msg = JSON.parse(e.data);
+  this.conn_.on('recv', function(msg) {
     switch (msg.Type) {
     case 'Snapshot':
       that.processSnapshotMsg_(msg);
-      onLoad(that);
-      return;
+      return onLoad(that);
     case 'Change':
-      that.processChangeMsg_(msg);
-      return;
+      return that.processChangeMsg_(msg);
     default:
       throw new Error('unknown message type: ' + msg.Type);
     }
-  };
-
-  this.ws_ = util.decorateWebSocket(ws);
+  });
 }
 
 Document.prototype.getModel = function() {
@@ -135,7 +130,7 @@ Document.prototype.sendOps_ = function(ops) {
   if (!ops.length) {
     return;
   }
-  this.ws_.sendMessage({
+  this.conn_.send({
     Type: 'Update',
     ClientId: this.clientId_,
     OpStrs: logoot.encodeOps(ops)
