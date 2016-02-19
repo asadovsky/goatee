@@ -9,8 +9,8 @@
 
 var eddie = require('eddie');
 
+var lib = require('../lib');
 var text = require('./text');
-var util = require('../util');
 
 module.exports = Document;
 
@@ -31,33 +31,28 @@ function Document(addr, docId, onLoad) {
   this.sentClientOpIdx_ = -1;
   this.ackedClientOpIdx_ = -1;
 
-  // Initialize WebSocket connection.
-  var ws = new WebSocket('ws://' + addr);
+  // Initialize connection.
+  this.conn_ = new lib.Conn(addr);
 
-  ws.onopen = function(e) {
-    that.ws_.sendMessage({
+  this.conn_.on('open', function() {
+    that.conn_.send({
       Type: 'Init',
       DocId: docId,
       DataType: 'ot.Text'
     });
-  };
+  });
 
-  ws.onmessage = function(e) {
-    var msg = JSON.parse(e.data);
+  this.conn_.on('recv', function(msg) {
     switch (msg.Type) {
     case 'Snapshot':
       that.processSnapshotMsg_(msg);
-      onLoad(that);
-      return;
+      return onLoad(that);
     case 'Change':
-      that.processChangeMsg_(msg);
-      return;
+      return that.processChangeMsg_(msg);
     default:
       throw new Error('unknown message type: ' + msg.Type);
     }
-  };
-
-  this.ws_ = util.decorateWebSocket(ws);
+  });
 }
 
 Document.prototype.getCollaborators = function() {
@@ -68,7 +63,7 @@ Document.prototype.getModel = function() {
   return this.m_;
 };
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////
 // Model event handlers
 
 Document.prototype.handleReplaceText = function(pos, len, value) {
@@ -83,7 +78,7 @@ Document.prototype.handleReplaceText = function(pos, len, value) {
   this.pushOps_(ops);
 };
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////
 // Incoming message handlers
 
 Document.prototype.processSnapshotMsg_ = function(msg) {
@@ -131,7 +126,7 @@ Document.prototype.processChangeMsg_ = function(msg) {
   }
 };
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////
 // Other private helpers
 
 Document.prototype.sendBufferedOps_ = function() {
@@ -141,7 +136,7 @@ Document.prototype.sendBufferedOps_ = function() {
   }
   this.sentClientOpIdx_ = this.clientOps_.length - 1;
   // TODO: Compact ops (e.g. combine insertions) before sending.
-  this.ws_.sendMessage({
+  this.conn_.send({
     Type: 'Update',
     ClientId: this.clientId_,
     BasePatchId: this.basePatchId_,

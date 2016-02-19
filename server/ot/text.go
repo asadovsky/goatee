@@ -168,7 +168,7 @@ func TransformPatch(a, b []Op) (ap, bp []Op) {
 }
 
 type patch struct {
-	clientId int
+	clientId uint32
 	ops      []Op
 }
 
@@ -177,7 +177,7 @@ type patch struct {
 type Text struct {
 	patches     []patch
 	value       string
-	lastPatchId int
+	lastPatchId uint32
 }
 
 func NewText(s string) *Text {
@@ -202,7 +202,7 @@ func (t *Text) ApplyUpdate(u *common.Update, c *common.Change) error {
 		return err
 	}
 	// Transform against past ops as needed.
-	for i := u.BasePatchId + 1; i < len(t.patches); i++ {
+	for i := u.BasePatchId + 1; i < uint32(len(t.patches)); i++ {
 		p := t.patches[i]
 		if u.ClientId == p.clientId {
 			// Note: Clients are responsible for buffering.

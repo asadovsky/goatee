@@ -3,7 +3,7 @@
 
 var inherits = require('inherits');
 
-var util = require('../util');
+var lib = require('../lib');
 
 function Op() {}
 
@@ -32,17 +32,17 @@ Delete.prototype.encode = function() {
 };
 
 function decodeOp(s) {
-  var parts = util.splitN(s, ',', 3);
+  var parts = lib.splitN(s, ',', 3);
   if (parts.length < 3) {
     throw new Error('failed to parse op: ' + s);
   }
-  var pos = Number(parts[1]);
+  var pos = lib.atoi(parts[1]);
   var t = parts[0];
   switch (t) {
   case 'i':
     return new Insert(pos, parts[2]);
   case 'd':
-    return new Delete(pos, Number(parts[2]));
+    return new Delete(pos, lib.atoi(parts[2]));
   default:
     throw new Error('unknown op type: ' + t);
   }

@@ -2,8 +2,8 @@
 
 var eddie = require('eddie');
 
+var lib = require('../lib');
 var logoot = require('./logoot');
-var util = require('../util');
 
 module.exports = Document;
 
@@ -15,7 +15,7 @@ function Document(addr, docId, onLoad) {
   this.m_ = null;
 
   // Initialize connection.
-  this.conn_ = new util.Conn(addr);
+  this.conn_ = new lib.Conn(addr);
 
   this.conn_.on('open', function() {
     that.conn_.send({
@@ -42,7 +42,7 @@ Document.prototype.getModel = function() {
   return this.m_;
 };
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////
 // Model event handlers
 
 Document.prototype.handleReplaceText = function(pos, len, value) {
@@ -61,23 +61,19 @@ Document.prototype.handleReplaceText = function(pos, len, value) {
   this.sendOps_(ops);
 };
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////
 // Incoming message handlers
 
 Document.prototype.processSnapshotMsg_ = function(msg) {
   console.assert(this.clientId_ === null);
   this.clientId_ = msg.ClientId;
-  this.logoot_ = logoot.decodeLogoot(msg.LogootStr);
+  this.logoot_ = logoot.decode(msg.LogootStr);
   this.m_ = new eddie.AsyncModel(this, msg.Text);
 };
 
 Document.prototype.processChangeMsg_ = function(msg) {
   var that = this;
   var isLocal = msg.ClientId === this.clientId_;
-
-  // Apply all mutations, regardless of whether they originated from this client
-  // (i.e. unidirectional data flow).
-  var ops = logoot.decodeOps(msg.OpStrs);
 
   // Consecutive single-char insertions and deletions are common, and applying
   // lots of point mutations to the model is expensive (e.g. applying 400 point
@@ -90,6 +86,7 @@ Document.prototype.processChangeMsg_ = function(msg) {
     }
   }
 
+  var ops = logoot.decodeOps(msg.OpStrs);
   for (var i = 0; i < ops.length; i++) {
     var op = ops[i];
     switch(op.constructor.name) {
@@ -122,7 +119,7 @@ Document.prototype.processChangeMsg_ = function(msg) {
   applyReplaceText();
 };
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////
 // Other private helpers
 
 // TODO: Delta encoding; more efficient pid encoding; compression.

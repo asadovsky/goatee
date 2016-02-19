@@ -4,37 +4,56 @@
 var _ = require('lodash');
 var inherits = require('inherits');
 
-var util = require('../util');
+var lib = require('../lib');
 
-function pidLess(a, b) {
-  for (var i = 0; i < a.Ids.length; i++) {
-    if (i === b.Ids.length) {
+function Id(pos, agentId) {
+  this.pos = pos;
+  this.agentId = agentId;
+}
+
+function Pid(ids, seq) {
+  this.ids = ids;
+  this.seq = seq;
+}
+
+Pid.prototype.less = function(other) {
+  for (var i = 0; i < this.ids.length; i++) {
+    if (i === other.ids.length) {
       return false;
     }
-    var va = a.Ids[i], vb = b.Ids[i];
-    if (va.Pos !== vb.Pos) {
-      return va.Pos < vb.Pos;
-    } else if (va.AgentId !== vb.AgentId) {
-      return va.AgentId < vb.AgentId;
+    var v = this.ids[i], vo = other.ids[i];
+    if (v.pos !== vo.pos) {
+      return v.pos < vo.pos;
+    } else if (v.agentId !== vo.agentId) {
+      return v.agentId < vo.agentId;
     }
   }
-  return a.Ids.length < b.Ids.length;
-}
+  if (this.ids.length === other.ids.length) {
+    return this.seq < other.seq;
+  }
+  return true;
+};
 
-function pidEncode(pid) {
-  return _.map(pid.Ids, function(id) {
-    return [id.Pos, id.AgentId].join('.');
-  }).join(':');
-}
+Pid.prototype.encode = function() {
+  return _.map(this.ids, function(id) {
+    return [id.pos, id.agentId].join('.');
+  }).join(':') + '~' + this.seq;
+};
 
 function decodePid(s) {
-  return {Ids: _.map(s.split(':'), function(idStr) {
+  var idsAndSeq = s.split('~');
+  if (idsAndSeq.length !== 2 ) {
+    throw new Error('invalid pid: ' + s);
+  }
+  var seq = lib.atoi(idsAndSeq[1]);
+  var ids = _.map(idsAndSeq[0].split(':'), function(idStr) {
     var parts = idStr.split('.');
     if (parts.length !== 2) {
-      throw new Error('invalid pid: ' + s);
+      throw new Error('invalid id: ' + idStr);
     }
-    return {Pos: Number(parts[0]), AgentId: Number(parts[1])};
-  })};
+    return new Id(lib.atoi(parts[0]), lib.atoi(parts[1]));
+  });
+  return new Pid(ids, seq);
 }
 
 function Op() {}
@@ -52,8 +71,8 @@ function ClientInsert(prevPid, nextPid, value) {
 }
 
 ClientInsert.prototype.encode = function() {
-  var prevPid = this.prevPid ? pidEncode(this.prevPid) : '';
-  var nextPid = this.nextPid ? pidEncode(this.nextPid) : '';
+  var prevPid = this.prevPid ? this.prevPid.encode() : '';
+  var nextPid = this.nextPid ? this.nextPid.encode() : '';
   return ['ci', prevPid, nextPid, this.value].join(',');
 };
 
@@ -65,7 +84,7 @@ function Insert(pid, value) {
 }
 
 Insert.prototype.encode = function() {
-  return ['i', pidEncode(this.pid), this.value].join(',');
+  return ['i', this.pid.encode(), this.value].join(',');
 };
 
 inherits(Delete, Op);
@@ -75,7 +94,7 @@ function Delete(pid) {
 }
 
 Delete.prototype.encode = function() {
-  return ['d', pidEncode(this.pid)].join(',');
+  return ['d', this.pid.encode()].join(',');
 };
 
 function newParseError(s) {
@@ -87,19 +106,19 @@ function decodeOp(s) {
   var t = s.split(',', 1)[0];
   switch (t) {
   case 'ci':
-    parts = util.splitN(s, ',', 4);
+    parts = lib.splitN(s, ',', 4);
     if (parts.length < 4) {
       throw newParseError(s);
     }
     return new ClientInsert(decodePid(parts[1]), decodePid(parts[2]), parts[3]);
   case 'i':
-    parts = util.splitN(s, ',', 3);
+    parts = lib.splitN(s, ',', 3);
     if (parts.length < 3) {
       throw newParseError(s);
     }
     return new Insert(decodePid(parts[1]), parts[2]);
   case 'd':
-    parts = util.splitN(s, ',', 2);
+    parts = lib.splitN(s, ',', 2);
     if (parts.length < 2) {
       throw newParseError(s);
     }
@@ -125,12 +144,20 @@ function decodeOps(strs) {
   return ops;
 }
 
+function Atom(pid, value) {
+  this.pid = pid;
+  this.value = value;
+}
+
 function Logoot(atoms) {
   this.atoms_ = atoms;
 }
 
-function decodeLogoot(s) {
-  return new Logoot(JSON.parse(s));
+function decode(s) {
+  var atoms = JSON.parse(s);
+  return new Logoot(_.map(atoms, function(atom) {
+    return new Atom(decodePid(atom.Pid), atom.Value);
+  }));
 }
 
 Logoot.prototype.len = function() {
@@ -138,12 +165,12 @@ Logoot.prototype.len = function() {
 };
 
 Logoot.prototype.pid = function(i) {
-  return this.atoms_[i].Pid;
+  return this.atoms_[i].pid;
 };
 
 Logoot.prototype.applyInsertText = function(op) {
   var p = this.search_(op.pid);
-  this.atoms_.splice(p, 0, {Pid: op.pid, Value: op.value});
+  this.atoms_.splice(p, 0, {pid: op.pid, value: op.value});
   return p;
 };
 
@@ -155,8 +182,8 @@ Logoot.prototype.applyDeleteText = function(op) {
 
 Logoot.prototype.search_ = function(pid) {
   var that = this;
-  return util.search(this.atoms_.length, function(i) {
-    return !pidLess(that.atoms_[i].Pid, pid);
+  return lib.search(this.atoms_.length, function(i) {
+    return !that.atoms_[i].pid.less(pid);
   });
 };
 
@@ -167,5 +194,5 @@ module.exports = {
   encodeOps: encodeOps,
   decodeOps: decodeOps,
   Logoot: Logoot,
-  decodeLogoot: decodeLogoot
+  decode: decode
 };

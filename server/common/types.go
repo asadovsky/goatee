@@ -9,17 +9,17 @@ type MsgType struct {
 // Sent from client to server.
 type Init struct {
 	Type     string
-	DocId    int
+	DocId    uint32
 	DataType string // "ot.Text" or "crdt.Logoot"
 }
 
 // Sent from server to client.
 type Snapshot struct {
 	Type     string
-	ClientId int // id for this client
+	ClientId uint32 // id for this client
 
 	// Type-specific data.
-	BasePatchId int    // initial BasePatchId
+	BasePatchId uint32 // initial BasePatchId
 	Text        string // initial text
 	LogootStr   string // encoded crdt.Logoot
 }
@@ -27,19 +27,19 @@ type Snapshot struct {
 // Sent from client to server.
 type Update struct {
 	Type     string
-	ClientId int // client that performed this patch
+	ClientId uint32 // client that created this patch
 
 	// Type-specific data.
-	BasePatchId int      // PatchId against which this patch was performed
+	BasePatchId uint32   // PatchId against which this patch was performed
 	OpStrs      []string // encoded ops
 }
 
 // Sent from server to client.
 type Change struct {
 	Type     string
-	ClientId int // client that performed this patch
+	ClientId uint32 // client that created this patch
 
 	// Type-specific data.
-	PatchId int
+	PatchId uint32
 	OpStrs  []string // encoded ops
 }

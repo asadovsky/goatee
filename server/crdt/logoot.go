@@ -7,17 +7,10 @@ import (
 	"math"
 	"math/rand"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/asadovsky/goatee/server/common"
 )
-
-func assert(b bool, v ...interface{}) {
-	if !b {
-		panic(fmt.Sprint(v...))
-	}
-}
 
 // Prototype implementation notes:
 // - Server: single Logoot document (analog of OT server)
@@ -46,19 +39,26 @@ func assert(b bool, v ...interface{}) {
 // For now, we go with approach #2. If unidirectional data flow proves too slow,
 // we'll likely need to switch to approach #3 or #4.
 
-type Id struct {
+func assert(b bool, v ...interface{}) {
+	if !b {
+		panic(fmt.Sprint(v...))
+	}
+}
+
+// id is a Logoot identifier.
+type id struct {
 	Pos     uint32
-	AgentId int
+	AgentId uint32
 }
 
-// Pid is a Logoot position identifier.
-// TODO: Add logical clock value.
-type Pid struct {
-	Ids []Id
+// pid is a Logoot position identifier.
+type pid struct {
+	Ids []id
+	Seq uint32 // logical clock value for the last id's agent
 }
 
-// Less returns true if p is less than other.
-func (p *Pid) Less(other *Pid) bool {
+// Less returns true iff p is less than other.
+func (p *pid) Less(other *pid) bool {
 	for i, v := range p.Ids {
 		if i == len(other.Ids) {
 			return false
@@ -70,12 +70,15 @@ func (p *Pid) Less(other *Pid) bool {
 			return v.AgentId < vo.AgentId
 		}
 	}
-	return len(p.Ids) < len(other.Ids)
+	if len(p.Ids) == len(other.Ids) {
+		return p.Seq < other.Seq
+	}
+	return true
 }
 
-// Equal returns true if p is equal to other.
-func (p *Pid) Equal(other *Pid) bool {
-	if len(p.Ids) != len(other.Ids) {
+// Equal returns true iff p is equal to other.
+func (p *pid) Equal(other *pid) bool {
+	if len(p.Ids) != len(other.Ids) || p.Seq != other.Seq {
 		return false
 	}
 	for i, v := range p.Ids {
@@ -87,48 +90,60 @@ func (p *Pid) Equal(other *Pid) bool {
 	return true
 }
 
-func (p *Pid) Encode() string {
+// Encode encodes this pid.
+func (p *pid) Encode() string {
 	idStrs := make([]string, len(p.Ids))
 	for i, v := range p.Ids {
 		idStrs[i] = fmt.Sprintf("%d.%d", v.Pos, v.AgentId)
 	}
-	return strings.Join(idStrs, ":")
+	return strings.Join(idStrs, ":") + "~" + common.Itoa(p.Seq)
 }
 
-func DecodePid(s string) (*Pid, error) {
-	idStrs := strings.Split(s, ":")
-	ids := make([]Id, len(idStrs))
+// decodePid decodes the given string into a pid.
+func decodePid(s string) (*pid, error) {
+	idsAndSeq := strings.Split(s, "~")
+	if len(idsAndSeq) != 2 {
+		return nil, fmt.Errorf("invalid pid: %s", s)
+	}
+	seq, err := common.Atoi(idsAndSeq[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid seq: %s", s)
+	}
+	idStrs := strings.Split(idsAndSeq[0], ":")
+	ids := make([]id, len(idStrs))
 	for i, v := range idStrs {
 		parts := strings.Split(v, ".")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid id: %s", v)
 		}
-		pos, err := strconv.ParseUint(parts[0], 10, 32)
+		pos, err := common.Atoi(parts[0])
 		if err != nil {
 			return nil, fmt.Errorf("invalid pos: %s", v)
 		}
-		agentId, err := strconv.Atoi(parts[1])
+		agentId, err := common.Atoi(parts[1])
 		if err != nil {
 			return nil, fmt.Errorf("invalid agentId: %s", v)
 		}
-		ids[i] = Id{Pos: uint32(pos), AgentId: agentId}
+		ids[i] = id{Pos: uint32(pos), AgentId: agentId}
 	}
-	return &Pid{Ids: ids}, nil
+	return &pid{Ids: ids, Seq: seq}, nil
 }
 
-// Op is an operation.
-type Op interface {
+// op is an operation.
+type op interface {
+	// Encode encodes this op.
 	Encode() string
 }
 
-// ClientInsert represents an atom insertion from a client.
-type ClientInsert struct {
-	PrevPid *Pid   // nil means start of document
-	NextPid *Pid   // nil means end of document
+// clientInsert represents an atom insertion from a client.
+type clientInsert struct {
+	PrevPid *pid   // nil means start of document
+	NextPid *pid   // nil means end of document
 	Value   string // may contain multiple characters
 }
 
-func (op *ClientInsert) Encode() string {
+// Encode encodes this op.
+func (op *clientInsert) Encode() string {
 	var prevPidStr, nextPidStr string
 	if op.PrevPid != nil {
 		prevPidStr = op.PrevPid.Encode()
@@ -139,26 +154,28 @@ func (op *ClientInsert) Encode() string {
 	return fmt.Sprintf("ci,%s,%s,%s", prevPidStr, nextPidStr, op.Value)
 }
 
-// Insert represents an atom insertion.
-type Insert struct {
-	Pid   *Pid
+// insert represents an atom insertion.
+type insert struct {
+	Pid   *pid
 	Value string
 }
 
-func (op *Insert) Encode() string {
+// Encode encodes this op.
+func (op *insert) Encode() string {
 	return fmt.Sprintf("i,%s,%s", op.Pid.Encode(), op.Value)
 }
 
-// Delete represents an atom deletion. Pid is the position identifier of the
-// deleted atom. Note, Delete cannot be defined as a [start, end] range because
-// it must commute with Insert.
-// TODO: To reduce client->server message size, maybe add a ClientDelete
+// delete represents an atom deletion. Pid is the position identifier of the
+// deleted atom. Note, delete cannot be defined as a [start, end] range because
+// it must commute with insert.
+// TODO: To reduce client->server message size, maybe add a clientDelete
 // operation defined as a [start, end] range.
-type Delete struct {
-	Pid *Pid
+type delete struct {
+	Pid *pid
 }
 
-func (op *Delete) Encode() string {
+// Encode encodes this op.
+func (op *delete) Encode() string {
 	return fmt.Sprintf("d,%s", op.Pid.Encode())
 }
 
@@ -166,8 +183,8 @@ func newParseError(s string) error {
 	return fmt.Errorf("failed to parse op: %s", s)
 }
 
-// DecodeOp returns an Op given an encoded op.
-func DecodeOp(s string) (Op, error) {
+// decodeOp decodes the given string into an op.
+func decodeOp(s string) (op, error) {
 	parts := strings.SplitN(s, ",", 2)
 	t := parts[0]
 	switch t {
@@ -176,59 +193,59 @@ func DecodeOp(s string) (Op, error) {
 		if len(parts) < 4 {
 			return nil, newParseError(s)
 		}
-		var prevPid, nextPid *Pid
+		var prevPid, nextPid *pid
 		var err error
 		if parts[1] != "" {
-			if prevPid, err = DecodePid(parts[1]); err != nil {
+			if prevPid, err = decodePid(parts[1]); err != nil {
 				return nil, newParseError(s)
 			}
 		}
 		if parts[2] != "" {
-			if nextPid, err = DecodePid(parts[2]); err != nil {
+			if nextPid, err = decodePid(parts[2]); err != nil {
 				return nil, newParseError(s)
 			}
 		}
 		if err != nil {
 			return nil, newParseError(s)
 		}
-		return &ClientInsert{prevPid, nextPid, parts[3]}, nil
+		return &clientInsert{prevPid, nextPid, parts[3]}, nil
 	case "i":
 		parts = strings.SplitN(s, ",", 3)
 		if len(parts) < 3 {
 			return nil, newParseError(s)
 		}
-		pid, err := DecodePid(parts[1])
+		pid, err := decodePid(parts[1])
 		if err != nil {
 			return nil, newParseError(s)
 		}
-		return &Insert{pid, parts[2]}, nil
+		return &insert{pid, parts[2]}, nil
 	case "d":
 		parts = strings.SplitN(s, ",", 2)
 		if len(parts) < 2 {
 			return nil, newParseError(s)
 		}
-		pid, err := DecodePid(parts[1])
+		pid, err := decodePid(parts[1])
 		if err != nil {
 			return nil, newParseError(s)
 		}
-		return &Delete{pid}, nil
+		return &delete{pid}, nil
 	default:
 		return nil, fmt.Errorf("unknown op type: %s", t)
 	}
 }
 
-func EncodeOps(ops []Op) []string {
+func encodeOps(ops []op) ([]string, error) {
 	strs := make([]string, len(ops))
 	for i, v := range ops {
 		strs[i] = v.Encode()
 	}
-	return strs
+	return strs, nil
 }
 
-func DecodeOps(strs []string) ([]Op, error) {
-	ops := make([]Op, len(strs))
+func decodeOps(strs []string) ([]op, error) {
+	ops := make([]op, len(strs))
 	for i, v := range strs {
-		op, err := DecodeOp(v)
+		op, err := decodeOp(v)
 		if err != nil {
 			return nil, err
 		}
@@ -237,25 +254,44 @@ func DecodeOps(strs []string) ([]Op, error) {
 	return ops, nil
 }
 
-// Exported (along with Pid and Id) to support Logoot.Encode.
-type Atom struct {
-	Pid *Pid
+// atom is an atom in a Logoot document.
+type atom struct {
+	Pid *pid
 	// TODO: Switch to rune?
 	Value string
 }
 
-// Logoot represents a string that supports Logoot operations.
-type Logoot struct {
-	atoms []Atom
-	value string
+var _ json.Marshaler = (*atom)(nil)
+
+// MarshalJSON marshals to JSON.
+func (a *atom) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Pid   string
+		Value string
+	}{
+		Pid:   a.Pid.Encode(),
+		Value: a.Value,
+	})
 }
 
+// Logoot is a CRDT string.
+type Logoot struct {
+	atoms []atom
+	text  string
+}
+
+// NewLogoot returns a new Logoot.
 func NewLogoot() *Logoot {
 	return &Logoot{}
 }
 
-func (l *Logoot) Value() string {
-	return l.value
+// Encode encodes this Logoot as needed for use in the client library.
+func (l *Logoot) Encode() (string, error) {
+	buf, err := json.Marshal(l.atoms)
+	if err != nil {
+		return "", err
+	}
+	return string(buf), nil
 }
 
 // PopulateSnapshot populates s.
@@ -264,57 +300,50 @@ func (l *Logoot) PopulateSnapshot(s *common.Snapshot) error {
 	if err != nil {
 		return err
 	}
-	s.Text = l.value
+	s.Text = l.text
 	s.LogootStr = logootStr
 	return nil
 }
 
 // ApplyUpdate applies u and populates c.
 func (l *Logoot) ApplyUpdate(u *common.Update, c *common.Change) error {
-	ops, err := DecodeOps(u.OpStrs)
+	ops, err := decodeOps(u.OpStrs)
 	if err != nil {
 		return err
 	}
-	appliedOps := make([]Op, 0, len(ops))
+	appliedOps := make([]op, 0, len(ops))
 	gotClientInsert := false
 	for _, op := range ops {
 		switch v := op.(type) {
-		case *ClientInsert:
+		case *clientInsert:
 			if gotClientInsert {
-				return errors.New("cannot apply multiple ClientInsert ops")
+				return errors.New("cannot apply multiple clientInsert ops")
 			}
 			gotClientInsert = true
 			// TODO: Smarter pid allocation.
 			prevPid := v.PrevPid
 			for j := 0; j < len(v.Value); j++ {
-				x := &Insert{genPid(u.ClientId, prevPid, v.NextPid), string(v.Value[j])}
+				x := &insert{genPid(u.ClientId, prevPid, v.NextPid), string(v.Value[j])}
 				l.applyInsertText(x)
 				appliedOps = append(appliedOps, x)
 				prevPid = x.Pid
 			}
-		case *Insert:
+		case *insert:
 			l.applyInsertText(v)
 			appliedOps = append(appliedOps, op)
-		case *Delete:
+		case *delete:
 			l.applyDeleteText(v)
 			appliedOps = append(appliedOps, op)
+		default:
+			return fmt.Errorf("unknown op type: %T", v)
 		}
 	}
-	c.OpStrs = EncodeOps(appliedOps)
-	return nil
-}
-
-// Encode encodes this Logoot as needed for use in the client library.
-func (l *Logoot) Encode() (string, error) {
-	atoms := l.atoms
-	if atoms == nil {
-		atoms = []Atom{}
-	}
-	buf, err := json.Marshal(atoms)
+	opStrs, err := encodeOps(appliedOps)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return string(buf), nil
+	c.OpStrs = opStrs
+	return nil
 }
 
 func randUint32Between(prev, next uint32) uint32 {
@@ -324,31 +353,34 @@ func randUint32Between(prev, next uint32) uint32 {
 // TODO: Smarter pid allocation, e.g. LSEQ. Also, maybe do something to ensure
 // that concurrent multi-atom insertions from different agents do not get
 // interleaved.
-func genIds(agentId int, prev, next []Id) []Id {
+func genIds(agentId uint32, prev, next []id) []id {
 	if len(prev) == 0 {
-		prev = []Id{{Pos: 0, AgentId: agentId}}
+		prev = []id{{Pos: 0, AgentId: agentId}}
 	}
 	if len(next) == 0 {
-		next = []Id{{Pos: math.MaxUint32, AgentId: agentId}}
+		next = []id{{Pos: math.MaxUint32, AgentId: agentId}}
 	}
 	if prev[0].Pos+1 < next[0].Pos {
-		return []Id{{Pos: randUint32Between(prev[0].Pos, next[0].Pos), AgentId: agentId}}
+		return []id{{Pos: randUint32Between(prev[0].Pos, next[0].Pos), AgentId: agentId}}
 	}
-	return append([]Id{prev[0]}, genIds(agentId, prev[1:], next[1:])...)
+	return append([]id{prev[0]}, genIds(agentId, prev[1:], next[1:])...)
 }
 
-func genPid(agentId int, prev, next *Pid) *Pid {
-	prevIds, nextIds := []Id{}, []Id{}
+var seq uint32 = 0
+
+func genPid(agentId uint32, prev, next *pid) *pid {
+	prevIds, nextIds := []id{}, []id{}
 	if prev != nil {
 		prevIds = prev.Ids
 	}
 	if next != nil {
 		nextIds = next.Ids
 	}
-	return &Pid{Ids: genIds(agentId, prevIds, nextIds)}
+	seq++
+	return &pid{Ids: genIds(agentId, prevIds, nextIds), Seq: seq}
 }
 
-func (l *Logoot) applyInsertText(op *Insert) {
+func (l *Logoot) applyInsertText(op *insert) {
 	a := l.atoms
 	p := l.search(op.Pid)
 	if p != len(a) && a[p].Pid.Equal(op.Pid) {
@@ -356,26 +388,26 @@ func (l *Logoot) applyInsertText(op *Insert) {
 		return
 	}
 	// https://github.com/golang/go/wiki/SliceTricks
-	a = append(a, Atom{})
+	a = append(a, atom{})
 	copy(a[p+1:], a[p:])
-	a[p] = Atom{Pid: op.Pid, Value: op.Value}
+	a[p] = atom{Pid: op.Pid, Value: op.Value}
 	l.atoms = a
-	l.value = l.value[:p] + op.Value + l.value[p:]
+	l.text = l.text[:p] + op.Value + l.text[p:]
 }
 
-func (l *Logoot) applyDeleteText(op *Delete) {
+func (l *Logoot) applyDeleteText(op *delete) {
 	a := l.atoms
 	p := l.search(op.Pid)
 	if p == len(a) || !a[p].Pid.Equal(op.Pid) {
 		return
 	}
 	// https://github.com/golang/go/wiki/SliceTricks
-	a, a[len(a)-1] = append(a[:p], a[p+1:]...), Atom{}
+	a, a[len(a)-1] = append(a[:p], a[p+1:]...), atom{}
 	l.atoms = a
-	l.value = l.value[:p] + l.value[p+1:]
+	l.text = l.text[:p] + l.text[p+1:]
 }
 
 // search returns the position of the first atom with pid >= the given pid.
-func (l *Logoot) search(pid *Pid) int {
+func (l *Logoot) search(pid *pid) int {
 	return sort.Search(len(l.atoms), func(i int) bool { return !l.atoms[i].Pid.Less(pid) })
 }

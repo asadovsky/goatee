@@ -40,7 +40,7 @@ type hub struct {
 	unsubscribe  chan chan<- []byte
 	broadcast    chan []byte
 	mu           sync.Mutex // protects the fields below
-	nextClientId int
+	nextClientId uint32
 	text         *ot.Text
 	logoot       *crdt.Logoot
 }
