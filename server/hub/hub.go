@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -32,6 +33,10 @@ func jsonMarshal(v interface{}) []byte {
 	buf, err := json.Marshal(v)
 	ok(err)
 	return buf
+}
+
+func isReadFromClosedConnError(err error) bool {
+	return websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway)
 }
 
 type hub struct {
@@ -144,39 +149,34 @@ func (s *stream) streamChanges() {
 }
 
 func (h *hub) handleConn(w http.ResponseWriter, r *http.Request) {
-	const bufSize = 1024
-	conn, err := websocket.Upgrade(w, r, nil, bufSize, bufSize)
+	conn, err := websocket.Upgrade(w, r, nil, 0, 0)
 	ok(err)
 	s := &stream{h: h, conn: conn, send: make(chan []byte)}
-	done := make(chan struct{})
 
-	go func() {
-		for {
-			_, buf, err := conn.ReadMessage()
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				close(done)
-				return
-			}
-			ok(err)
-			// TODO: Avoid decoding multiple times.
-			var mt common.MsgType
-			ok(json.Unmarshal(buf, &mt))
-			switch mt.Type {
-			case "Init":
-				var msg common.Init
-				ok(json.Unmarshal(buf, &msg))
-				ok(s.processInitMsg(&msg))
-			case "Update":
-				var msg common.Update
-				ok(json.Unmarshal(buf, &msg))
-				ok(s.processUpdateMsg(&msg))
-			default:
-				panic(fmt.Errorf("unknown message type: %s", mt.Type))
-			}
+	for {
+		_, buf, err := conn.ReadMessage()
+		if isReadFromClosedConnError(err) {
+			log.Printf("conn closed: %v", err)
+			break
 		}
-	}()
+		ok(err)
+		// TODO: Avoid decoding multiple times.
+		var mt common.MsgType
+		ok(json.Unmarshal(buf, &mt))
+		switch mt.Type {
+		case "Init":
+			var msg common.Init
+			ok(json.Unmarshal(buf, &msg))
+			ok(s.processInitMsg(&msg))
+		case "Update":
+			var msg common.Update
+			ok(json.Unmarshal(buf, &msg))
+			ok(s.processUpdateMsg(&msg))
+		default:
+			panic(fmt.Errorf("unknown message type: %s", mt.Type))
+		}
+	}
 
-	<-done
 	h.mu.Lock()
 	if s.initialized {
 		h.unsubscribe <- s.send

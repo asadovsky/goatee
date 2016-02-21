@@ -19,8 +19,9 @@ var (
 	loopback = flag.Bool("loopback", true, "")
 	port     = flag.Int("port", 4000, "")
 	mode     = flag.String("mode", "ot", "")
-	serve    = gosh.RegisterFunc("serve", hub.Serve)
 )
+
+var serve = gosh.RegisterFunc("serve", hub.Serve)
 
 func ok(err error) {
 	if err != nil {
@@ -54,7 +55,7 @@ func main() {
 		ok(err)
 	}
 	addr := fmt.Sprintf("%s:%d", hostname, *port)
-	httpAddr := fmt.Sprintf("%s:8080", hostname)
+	httpAddr := fmt.Sprintf("%s:%d", hostname, *port+100)
 	c := sh.FuncCmd(serve, addr)
 	c.AddStderrWriter(os.Stderr)
 	c.Start()
