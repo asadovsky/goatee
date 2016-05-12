@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 
 	"github.com/asadovsky/gosh"
 
@@ -62,6 +61,6 @@ func main() {
 	c.AwaitVars("ready")
 	// Note, the "open" command doesn't support query strings in file urls.
 	fmt.Printf("http://%s/demo/index.html?mode=%s&addr=%s\n", httpAddr, *mode, url.QueryEscape(addr))
-	ok(http.ListenAndServe(httpAddr, http.FileServer(http.Dir(filepath.Join(cwd)))))
+	ok(http.ListenAndServe(httpAddr, http.FileServer(http.Dir(cwd))))
 	c.Wait()
 }
